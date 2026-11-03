@@ -28,6 +28,14 @@ ENEMY_SPEED = 2
 ENEMY_SPAWN_INTERVAL = 1400      # ミリ秒
 ENEMY_SHOT_INTERVAL = 1600       # ミリ秒
 ENEMY_BULLET_SPEED = 4
+ZIGZAG_ENEMY_SPEED_X=3
+ZIGZAG_ENEMY_RATE=0.25
+ARMOR_ENEMY_SIZE=(64,64)
+ARMOR_ENEMY_SPEED=1
+ARMOR_ENEMY_RATE=0.15
+ARMOR_WEAK_KIND="big"
+
+
 
 # 画像が読み込めない場合の仮表示色
 PLAYER_COLOR = (80, 220, 255)
@@ -41,13 +49,15 @@ ENEMY_BULLET_COLOR = (255, 120, 80)
 # ============================================================
 
 class Projectile:
-    def __init__(self, x, y, vx, vy, color, radius=5):
+    def __init__(self, x, y, vx, vy, color, radius=5, kind="normal"):
         self.x = float(x)
         self.y = float(y)
         self.vx = float(vx)
         self.vy = float(vy)
         self.color = color
+        self.kind = kind
         self.radius = radius
+        self
 
         self.rect = pygame.Rect(0, 0, radius * 2, radius * 2)
         self.rect.center = (round(self.x), round(self.y))
@@ -145,10 +155,11 @@ class Player:
 class Enemy:
     def __init__(self):
         self.image = self.load_image()
-
+        self.speed=ENEMY_SPEED
         x = random.randint(
             ENEMY_SIZE[0] // 2,
             SCREEN_WIDTH - ENEMY_SIZE[0] // 2
+
         )
 
         self.rect = self.image.get_rect()
@@ -184,7 +195,17 @@ class Enemy:
             return surface
     def update(self):
         # 敵は画面上部から下方向へ移動
-        self.rect.y += ENEMY_SPEED
+        self.rect.y += self.speed
+    def hit(self,bullet:Projectile)->bool:
+        return True
+    
+        # 弾の種類に応じて敵の耐久力を減らす
+        if bullet.kind == "normal":
+            self.speed += 0.5  # 通常弾の場合、敵の速度を上げる
+        elif bullet.kind == "big":
+            self.speed += 1.0  # 大きな弾の場合、さらに速度を上げる
+        elif bullet.kind == "armor":
+            self.speed += 0.2  # 装甲弾の場合、少しだけ速度を上げる
 
     def shoot(self, now, player_center):
         if now - self.last_shot_time < ENEMY_SHOT_INTERVAL:
@@ -215,7 +236,28 @@ class Enemy:
 
     def draw(self, screen):
         screen.blit(self.image, self.rect)
+class ZigZagEnemy(Enemy):
+    def __init__(self):
+        super().__init__()
+        pygame.draw.rect(self.image,(80,255,80),self.image.get_rect(),3)
+        self.vx=random.choice([-ZIGZAG_ENEMY_SPEED_X,ZIGZAG_ENEMY_SPEED_X])
 
+    def update(self)->None:
+        super().update()
+        self.rect.x+=self.vx
+        if self.rect.left<0 or self.rect.right>SCREEN_WIDTH:
+            self.vx*=-1
+
+class ArmorEnemy(Enemy):
+    def __init__(self):
+
+        super().__init__()
+        self.image=pygame.transform.smoothscale(self.image,ARMOR_ENEMY_SIZE)
+        self.rect=self.image.get_rect(midtop=self.rect.midtop)
+        pygame.draw.rect(self.image,(220,220,220),self.image.get_rect(),5)
+        self.speed=ARMOR_ENEMY_SPEED
+    def hit(self,bullet:Projectile)->bool:
+        return bullet.kind==ARMOR_WEAK_KIND
 
 # ============================================================
 # ゲーム管理クラス
@@ -343,7 +385,8 @@ class Game:
 
             if hit_enemy is not None:
                 self.player_bullets.remove(bullet)
-                self.enemies.remove(hit_enemy)
+                if hit_enemy.hit(bullet):
+                    self.enemies.remove(hit_enemy)
 
         # 敵の弾と主人公の当たり判定
         for bullet in self.enemy_bullets:
@@ -372,7 +415,15 @@ class Game:
             bullet.draw(self.screen)
 
         pygame.display.flip()
-
+    def spawn_enemy(self):    
+        r=random.random()
+        if r<ARMOR_ENEMY_RATE:
+            self.enemies.append(ArmorEnemy())
+        elif r<ARMOR_ENEMY_RATE+ZIGZAG_ENEMY_RATE:
+            self.enemies.append(ZigZagEnemy())
+        else:
+            self.enemies.append(Enemy())    
+             
     def run(self):
         while self.running:
             self.clock.tick(FPS)
