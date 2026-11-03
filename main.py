@@ -216,6 +216,46 @@ class Enemy:
     def draw(self, screen):
         screen.blit(self.image, self.rect)
 
+# ============================================================
+# 体力ゲージクラス
+# ============================================================
+
+class Life:
+    def __init__(self):
+        self.hp = 100
+        self.max_hp = 100
+
+    # ダメージ処理
+    def hp_damage(self, damage):
+        self.hp -= damage
+        if self.hp < 0:
+            self.hp = 0
+
+    # 体力ゲージ描画
+    def draw(self, screen):
+        x = 20
+        y = 20
+        width = 200
+        height = 20
+
+        # ゲージの背景
+        pygame.draw.rect(screen, (100, 100, 100),(x, y, width, height))
+
+        # HPによって色を変更
+        if self.hp > 50:
+            color = (0, 255, 0)
+        elif self.hp > 20:
+            color = (255, 255, 0)
+        else:
+            color = (255, 0, 0)
+
+        # HPゲージ
+        pygame.draw.rect(screen, color,(x, y, width * self.hp / self.max_hp, height))
+
+        # HPの数値
+        font = pygame.font.SysFont(None, 30)
+        text = font.render(f"HP: {self.hp}/{self.max_hp}", True, (255, 255, 255))
+        screen.blit(text, (x, y + 25))
 
 # ============================================================
 # ゲーム管理クラス
@@ -224,7 +264,7 @@ class Enemy:
 class Game:
     def __init__(self):
         pygame.init()
-
+        self.life = Life()
         pygame.display.set_caption(WINDOW_TITLE)
 
         self.screen = pygame.display.set_mode(
@@ -266,6 +306,7 @@ class Game:
 
     def spawn_enemy(self):
         self.enemies.append(Enemy())
+
 
     def update(self):
         now = pygame.time.get_ticks()
@@ -348,9 +389,21 @@ class Game:
         # 敵の弾と主人公の当たり判定
         for bullet in self.enemy_bullets:
             if bullet.rect.colliderect(self.player.rect):
-                print("GAME OVER: 敵の弾が主人公に命中しました。")
-                self.running = False
+                # 当たった弾を削除
+                self.enemy_bullets.remove(bullet)
+
+                # 体力を10減らす
+                self.life.hp_damage(10)
+
+                # HPが0になったらゲームオーバー
+                if self.life.hp <= 0:
+                    print("GAME OVER")
+                    self.running = False
                 break
+
+                # print("GAME OVER: 敵の弾が主人公に命中しました。")
+                # self.running = False
+                # break
 
     def draw(self):
         # 背景描画
@@ -371,6 +424,7 @@ class Game:
         for bullet in self.enemy_bullets:
             bullet.draw(self.screen)
 
+        self.life.draw(self.screen)
         pygame.display.flip()
 
     def run(self):
