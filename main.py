@@ -1,6 +1,10 @@
 import math
 import random
 import sys
+import os
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+from pathlib import Path
+
 
 import pygame
 
@@ -14,9 +18,13 @@ SCREEN_HEIGHT = 800
 FPS = 60 
 WINDOW_TITLE = "SPACE SHOOTER"
 
-BACKGROUND_IMAGE = "assets/background.png"
-PLAYER_IMAGE = "assets/player.png"
-ENEMY_IMAGE = "assets/enemy.png"
+# Pythonファイルが保存されているフォルダ
+BASE_DIR = Path(__file__).resolve().parent
+
+# 画像ファイルの場所
+BACKGROUND_IMAGE = str(BASE_DIR / "assets" / "background.png")
+PLAYER_IMAGE = str(BASE_DIR / "assets" / "player.png")
+ENEMY_IMAGE = str(BASE_DIR / "assets" / "enemy.png")
 
 PLAYER_SIZE = (64, 64)
 PLAYER_SPEED = 5
