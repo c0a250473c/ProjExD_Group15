@@ -1,0 +1,1 @@
+ここに background.png（宇宙背景）と player.png（主人公画像）を配置してください。
