@@ -404,7 +404,56 @@ class Game:
                 # print("GAME OVER: 敵の弾が主人公に命中しました。")
                 # self.running = False
                 # break
+    def draw_damage_effect(self):
+        if self.life.hp <= 10:
+            x = self.player.rect.centerx
+            y = self.player.rect.centery
 
+            # 煙のアニメーション
+            t = pygame.time.get_ticks() / 300
+
+            hai = pygame.Surface(
+                self.screen.get_size(), pygame.SRCALPHA
+            )
+
+            for i in range(3):
+                smoke_x = x + math.sin(t + i * 2) * 15
+                smoke_y = y - 35 - i * 15 - abs(math.sin(t + i)) * 10
+
+                pygame.draw.circle(
+                    hai,
+                    (130, 130, 130, 100),
+                    (int(smoke_x), int(smoke_y)),
+                    12 + i * 3
+                )
+
+            self.screen.blit(hai, (0, 0))
+
+            # ひび割れ
+            pygame.draw.lines(
+                self.screen,
+                (40, 40, 40),
+                False,
+                [
+                    (x, y - 20),
+                    (x - 8, y - 5),
+                    (x + 3, y + 2),
+                    (x - 5, y + 18)
+                ],
+                3
+            )
+
+            pygame.draw.lines(
+                self.screen,
+                (40, 40, 40),
+                False,
+                [
+                    (x - 8, y - 5),
+                    (x - 18, y - 12),
+                    (x - 22, y - 22)
+                ],
+                2
+            )
     def draw(self):
         # 背景描画
         if self.background is not None:
@@ -425,6 +474,16 @@ class Game:
             bullet.draw(self.screen)
 
         self.life.draw(self.screen)
+        self.draw_damage_effect()
+
+        for enemy in self.enemies:
+            enemy.draw(self.screen)
+
+        for bullet in self.player_bullets:
+            bullet.draw(self.screen)
+
+        for bullet in self.enemy_bullets:
+            bullet.draw(self.screen)
         pygame.display.flip()
 
     def run(self):
