@@ -35,6 +35,16 @@ ENEMY_COLOR = (255, 100, 100)
 PLAYER_BULLET_COLOR = (255, 245, 100)
 ENEMY_BULLET_COLOR = (255, 120, 80)
 
+#どでか弾と鬱スタミナの数字
+MAX_STAMINA = 100.0
+UTSU_THRESHOLD = 30.0
+UTSU_SPEED = 2.0
+STAMINA_RECOVERY = 0.15
+DODEKA_COST = 50.0
+DODEKA_RADIUS = 40
+DODEKA_COLOR = (255, 50, 50)
+DODEKA_INTERVAL = 500
+
 
 # ============================================================
 # 弾クラス
@@ -77,7 +87,8 @@ class Player:
             center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 80)
         )
         self.last_shot_time = 0
-
+        self.stamina = MAX_STAMINA #タミナを満タンにして、大技をすぐに撃てる状態にセットするコード
+        self.last_dodeka_time = 0
     def load_image(self):
         try:
             image = pygame.image.load(PLAYER_IMAGE).convert_alpha()
@@ -95,21 +106,25 @@ class Player:
             return surface
 
     def update(self, keys):
+        if self.stamina < MAX_STAMINA:
+            self.stamina = min(self.stamina + STAMINA_RECOVERY, MAX_STAMINA)
+        current_speed = PLAYER_SPEED if self.stamina >= UTSU_THRESHOLD else UTSU_SPEED
+        #このコードは、ゲームが動いている間、毎フレーム（常に）キャラクターの状態を更新する処理の一部
         dx = 0
         dy = 0
 
         # 矢印キー・WASDによる移動
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-            dx -= PLAYER_SPEED
+            dx -= current_speed #変更
 
         if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-            dx += PLAYER_SPEED
+            dx += current_speed #変更
 
         if keys[pygame.K_UP] or keys[pygame.K_w]:
-            dy -= PLAYER_SPEED
+            dy -= current_speed #変更
 
         if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-            dy += PLAYER_SPEED
+            dy += current_speed #変更
 
         self.rect.x += dx
         self.rect.y += dy
@@ -136,6 +151,19 @@ class Player:
 
     def draw(self, screen):
         screen.blit(self.image, self.rect)
+    def shoot_dodeka(self, now):
+        if now - self.last_dodeka_time < DODEKA_INTERVAL:
+            return None
+        
+        if  self.stamina >= DODEKA_COST:
+            self.stamina -= DODEKA_COST
+            self.last_dodeka_time = now
+            return Projectile(
+                self.rect.centerx, self.rect.top, 0,
+                -PLAYER_BULLET_SPEED + 2, DODEKA_COLOR, radius=DODEKA_RADIUS
+            )
+        return None
+        #時間経過とスタミナの量の2つの条件を満たした時スタミナをガッツリ消費し巨大な弾を発射する
 
 
 # ============================================================
@@ -281,6 +309,12 @@ class Game:
             if bullet is not None:
                 self.player_bullets.append(bullet)
 
+        if keys[pygame.K_x]:# Xキーによるどでか弾の発射
+            dodeka_bullet = self.player.shoot_dodeka(now)
+
+            if dodeka_bullet is not None:
+                self.player_bullets.append(dodeka_bullet)
+
         # 一定時間ごとに敵を生成
         if now - self.last_enemy_spawn >= ENEMY_SPAWN_INTERVAL:
             self.spawn_enemy()
@@ -351,6 +385,14 @@ class Game:
                 print("GAME OVER: 敵の弾が主人公に命中しました。")
                 self.running = False
                 break
+
+    def draw_stamina_bar(self):
+        bar_width = 200 * (self.player.stamina / MAX_STAMINA)
+        bar_color = (150, 255, 100) if self.player.stamina >= UTSU_THRESHOLD else (128, 0, 128)
+        pygame.draw.rect(self.screen, (50, 50, 50), (10, SCREEN_HEIGHT - 30, 200, 15))
+        if bar_width > 0:
+            pygame.draw.rect(self.screen, bar_color, (10, SCREEN_HEIGHT - 30, bar_width, 15))
+            #現在のスタミナ残量を示すゲージ（バー）」を描画するための処理
 
     def draw(self):
         # 背景描画
