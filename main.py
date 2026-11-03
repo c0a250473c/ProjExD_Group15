@@ -413,6 +413,8 @@ class Game:
         for bullet in self.enemy_bullets:
             bullet.draw(self.screen)
 
+        self.draw_stamina_bar()
+
         pygame.display.flip()
 
     def run(self):
