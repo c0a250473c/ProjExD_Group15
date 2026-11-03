@@ -25,6 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent
 BACKGROUND_IMAGE = str(BASE_DIR / "assets" / "background.png")
 PLAYER_IMAGE = str(BASE_DIR / "assets" / "player.png")
 ENEMY_IMAGE = str(BASE_DIR / "assets" / "enemy.png")
+BOSS_IMAGE = str(BASE_DIR / "assets" / "boss.ping") #boss画像を読み込み
 
 PLAYER_SIZE = (64, 64)
 PLAYER_SPEED = 5
@@ -37,12 +38,19 @@ ENEMY_SPAWN_INTERVAL = 1400      # ミリ秒
 ENEMY_SHOT_INTERVAL = 1600       # ミリ秒
 ENEMY_BULLET_SPEED = 4
 
+#bossの設定
+BOSS_SIZE = (100, 100)
+BOSS_SPAWN_INTERVAL = 1400      # ミリ秒
+BOSS_SHOT_INTERVAL = 1600 
+BOSS_BULLET_SPEED = 4
+
 # 画像が読み込めない場合の仮表示色
 PLAYER_COLOR = (80, 220, 255)
 ENEMY_COLOR = (255, 100, 100)
 PLAYER_BULLET_COLOR = (255, 245, 100)
 ENEMY_BULLET_COLOR = (255, 120, 80)
-
+BOSS_COLOR = (0, 0, 0) #  bossの表示色
+BOSS_BULLET_COLOR = (0, 0, 0) #  bossの弾の色
 
 # ============================================================
 # 弾クラス
@@ -226,6 +234,82 @@ class Enemy:
 
 
 # ============================================================
+# ボスクラス
+# ============================================================
+class Boss:
+    def __init__(self):
+            self.image = self.load_image()
+    
+            x = random.randint(
+                BOSS_SIZE[0] // 2,
+                SCREEN_WIDTH - BOSS_SIZE[0] // 2
+            )
+    
+            self.rect = self.image.get_rect()
+            self.rect.midtop = (x, -BOSS_SIZE[1])
+    
+            self.last_shot_time = pygame.time.get_ticks()
+    
+    def load_image(self):
+        try:
+            image = pygame.image.load(
+                BOSS_IMAGE
+            ).convert_alpha()
+
+            return pygame.transform.smoothscale(
+                image,
+                BOSS_SIZE
+            )
+
+        except (pygame.error, FileNotFoundError):
+            print("ボス画像が見つかりません。仮画像を使用します。")
+
+            surface = pygame.Surface(
+                BOSS_SIZE,
+                pygame.SRCALPHA
+            )
+
+            pygame.draw.ellipse(
+                surface,
+                BOSS_COLOR,
+                surface.get_rect()
+            )
+
+            return surface
+        
+    def shoot(self, now, player_center):
+            if now - self.last_shot_time < BOSS_SHOT_INTERVAL:
+                return None
+    
+            self.last_shot_time = now
+    
+            # 主人公の方向に向けて弾を発射
+            dx = player_center[0] - self.rect.centerx
+            dy = player_center[1] - self.rect.centery
+    
+            distance = math.hypot(dx, dy)
+    
+            if distance == 0:
+                distance = 1
+    
+            vx = dx / distance * BOSS_BULLET_SPEED
+            vy = dy / distance * BOSS_BULLET_SPEED
+    
+            return Projectile(
+                self.rect.centerx,
+                self.rect.bottom,
+                vx,
+                vy,
+                BOSS_BULLET_COLOR,
+                radius=6
+            )
+    
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)    
+
+
+
+# ============================================================
 # ゲーム管理クラス
 # ============================================================
 
@@ -315,6 +399,9 @@ class Game:
 
         self.remove_offscreen_objects()
         self.check_collisions()
+      
+        time=pygame.time.get_ticks() # 時間を取得し続けて、一定時間になったらboss登場
+        # ptint(time)
 
     def remove_offscreen_objects(self):
         # 画面外に出た弾を削除
