@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent
 BACKGROUND_IMAGE = str(BASE_DIR / "assets" / "background.png")
 PLAYER_IMAGE = str(BASE_DIR / "assets" / "player.png")
 ENEMY_IMAGE = str(BASE_DIR / "assets" / "enemy.png")
-BOSS_IMAGE = str(BASE_DIR / "assets" / "boss.ping") #boss画像を読み込み
+BOSS_IMAGE = str(BASE_DIR / "assets" / "boss.png") #boss画像を読み込み
 
 PLAYER_SIZE = (64, 64)
 PLAYER_SPEED = 5
@@ -42,7 +42,7 @@ ENEMY_BULLET_SPEED = 4
 BOSS_SIZE = (100, 100)
 BOSS_SPAWN_INTERVAL = 1400      # ミリ秒
 BOSS_SHOT_INTERVAL = 1600 
-BOSS_BULLET_SPEED = 4
+BOSS_BULLET_SPEED = 6
 
 # 画像が読み込めない場合の仮表示色
 PLAYER_COLOR = (80, 220, 255)
@@ -50,7 +50,7 @@ ENEMY_COLOR = (255, 100, 100)
 PLAYER_BULLET_COLOR = (255, 245, 100)
 ENEMY_BULLET_COLOR = (255, 120, 80)
 BOSS_COLOR = (0, 0, 0) #  bossの表示色
-BOSS_BULLET_COLOR = (0, 0, 0) #  bossの弾の色
+BOSS_BULLET_COLOR = (255, 0, 0) #  bossの弾の色
 
 # ============================================================
 # 弾クラス
@@ -247,7 +247,7 @@ class Boss:
     
             self.rect = self.image.get_rect()
             self.rect.midtop = (x, -BOSS_SIZE[1])
-    
+            self.hp = 5
             self.last_shot_time = pygame.time.get_ticks()
     
     def load_image(self):
@@ -276,7 +276,12 @@ class Boss:
             )
 
             return surface
-        
+
+    def update(self):
+        # 画面上部の位置まで降りてくる
+        if self.rect.top < 30:
+            self.rect.y += 2  
+
     def shoot(self, now, player_center):
             if now - self.last_shot_time < BOSS_SHOT_INTERVAL:
                 return None
@@ -334,6 +339,9 @@ class Game:
         self.player_bullets = []
         self.enemy_bullets = []
 
+        self.boss = None #  開始時はbossはnone
+        self.last_boss_spawn = pygame.time.get_ticks()
+
         self.last_enemy_spawn = pygame.time.get_ticks()
 
     def load_background(self):
@@ -359,6 +367,10 @@ class Game:
     def spawn_enemy(self):
         self.enemies.append(Enemy())
 
+    def spawn_boss(self):
+        if self.boss is None:
+            self.boss = Boss()
+            print("ボスが登場しました！")
     def update(self):
         now = pygame.time.get_ticks()
         keys = pygame.key.get_pressed()
@@ -400,8 +412,27 @@ class Game:
         self.remove_offscreen_objects()
         self.check_collisions()
       
-        time=pygame.time.get_ticks() # 時間を取得し続けて、一定時間になったらboss登場
-        # ptint(time)
+       # ボスを10秒後に1回だけ出現させる
+        if (
+            self.boss is None
+            and now - self.last_boss_spawn >= 3000
+        ):
+            self.spawn_boss()
+
+        # ボスが存在するときの処理
+        if self.boss is not None:
+
+            # ボスの弾を発射
+            bullet = self.boss.shoot(
+                now,
+                self.player.rect.center
+            )
+
+            if bullet is not None:
+                self.enemy_bullets.append(bullet)
+        
+        if self.boss is not None: # bossがいたらアップデート
+            self.boss.update()
 
     def remove_offscreen_objects(self):
         # 画面外に出た弾を削除
@@ -447,6 +478,26 @@ class Game:
                 self.running = False
                 break
 
+        # 主人公の弾とボスの当たり判定
+        if self.boss is not None:
+
+            for bullet in self.player_bullets[:]:
+
+                if bullet.rect.colliderect(self.boss.rect):
+
+                    self.player_bullets.remove(bullet)
+                    self.boss.hp -= 1
+
+                    print("ボスHP:", self.boss.hp)
+
+                    # ボスを倒した場合
+                    if self.boss.hp <= 0:
+                        print("BOSS DEFEATED!")
+                        self.boss = None
+
+                    break
+        
+
     def draw(self):
         # 背景描画
         if self.background is not None:
@@ -465,6 +516,10 @@ class Game:
 
         for bullet in self.enemy_bullets:
             bullet.draw(self.screen)
+
+        # ボスの描画
+        if self.boss is not None:
+            self.boss.draw(self.screen)
 
         pygame.display.flip()
 
