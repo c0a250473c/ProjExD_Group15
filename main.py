@@ -8,6 +8,7 @@ import time # ゲームクリアで使用
 
 import pygame
 
+pygame.mixer.init() # 初期化（BGM用）
 
 # ============================================================
 # 設定
@@ -25,7 +26,9 @@ BASE_DIR = Path(__file__).resolve().parent
 BACKGROUND_IMAGE = str(BASE_DIR / "assets" / "background.png")
 PLAYER_IMAGE = str(BASE_DIR / "assets" / "player.png")
 ENEMY_IMAGE = str(BASE_DIR / "assets" / "enemy.png")
-BOSS_IMAGE = str(BASE_DIR / "assets" / "boss.png") #boss画像を読み込み
+BOSS_IMAGE = str(BASE_DIR / "assets" / "boss.png") #boss画像のパス
+BOSS_BGM = str(BASE_DIR / "assets" / "sounds" / "boss_bgm.mp3") #ボス戦bgmのパス
+CLEAR_BGM = str(BASE_DIR / "assets" / "sounds" / "clear_bgm.mp3") #  クリアBGMのパス
 
 PLAYER_SIZE = (64, 64)
 PLAYER_SPEED = 5
@@ -239,12 +242,13 @@ class Enemy:
 class Boss:
     def __init__(self):
             self.image = self.load_image()
-    
+
             x = random.randint(
                 BOSS_SIZE[0] // 2,
                 SCREEN_WIDTH - BOSS_SIZE[0] // 2
             )
-    
+            pygame.mixer.music.load(BOSS_BGM) #  BGMの読み込み
+            pygame.mixer.music.play(loops=-1) #  ループ再生
             self.rect = self.image.get_rect()
             self.rect.midtop = (x, -BOSS_SIZE[1])
             self.hp = 5
@@ -283,49 +287,52 @@ class Boss:
             self.rect.y += 2  
 
     def shoot(self, now, player_center):
-            if now - self.last_shot_time < BOSS_SHOT_INTERVAL:
-                return None
-    
-            self.last_shot_time = now
-    
-            # 主人公の方向に向けて弾を発射
-            dx = player_center[0] - self.rect.centerx
-            dy = player_center[1] - self.rect.centery
-    
-            distance = math.hypot(dx, dy)
-    
-            if distance == 0:
-                distance = 1
-    
-            vx = dx / distance * BOSS_BULLET_SPEED
-            vy = dy / distance * BOSS_BULLET_SPEED
-    
-            return Projectile(
-                self.rect.centerx,
-                self.rect.bottom,
-                vx,
-                vy,
-                BOSS_BULLET_COLOR,
-                radius=6
-            )
+        if now - self.last_shot_time < BOSS_SHOT_INTERVAL:
+            return None
+
+        self.last_shot_time = now
+
+        # 主人公の方向に向けて弾を発射
+        dx = player_center[0] - self.rect.centerx
+        dy = player_center[1] - self.rect.centery
+
+        distance = math.hypot(dx, dy)
+
+        if distance == 0:
+            distance = 1
+
+        vx = dx / distance * BOSS_BULLET_SPEED
+        vy = dy / distance * BOSS_BULLET_SPEED
+
+        return Projectile(
+            self.rect.centerx,
+            self.rect.bottom,
+            vx,
+            vy,
+            BOSS_BULLET_COLOR,
+            radius=6
+        )
     
     def draw(self, screen):
         screen.blit(self.image, self.rect)    
 
 # ゲームクリア関数
 def game_clear(screen:pygame.Surface):
+    pygame.mixer.music.stop()  # boss_bgm停止
+    pygame.mixer.music.load(CLEAR_BGM) #  クリアBGM読み込み
+    pygame.mixer.music.play() #  一回だけ流す
     brack=pygame.Surface((SCREEN_WIDTH,SCREEN_HEIGHT))
     pygame.draw.rect(brack,(0,0,0),pygame.Rect(0,0,SCREEN_WIDTH,SCREEN_HEIGHT))
     brack.set_alpha(200)
 
     font=pygame.font.Font(None, 80)
-    txt=font.render("GameClear!!",True,(255,255,255))
+    txt=font.render("GameClear!!",True,(255,255,0))
     text_rct=txt.get_rect(center=(SCREEN_WIDTH//2,SCREEN_HEIGHT//2))
     brack.blit(txt,text_rct)
 
     screen.blit(brack,(0,0))
     pygame.display.update()
-    time.sleep(5)
+    time.sleep(7)
     pygame.quit()
     sys.exit()
 
@@ -437,6 +444,7 @@ class Game:
 
         # ボスが存在するときの処理
         if self.boss is not None:
+            self.boss.update() #  bossがいたらまずアップデート
 
             # ボスの弾を発射
             bullet = self.boss.shoot(
@@ -447,9 +455,6 @@ class Game:
             if bullet is not None:
                 self.enemy_bullets.append(bullet)
         
-        if self.boss is not None: # bossがいたらアップデート
-            self.boss.update()
-
     def remove_offscreen_objects(self):
         # 画面外に出た弾を削除
         self.player_bullets = [
