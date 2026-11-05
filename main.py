@@ -41,7 +41,7 @@ ENEMY_BULLET_SPEED = 4
 #bossの設定
 BOSS_SIZE = (100, 100)
 BOSS_SPAWN_INTERVAL = 1400      # ミリ秒
-BOSS_SHOT_INTERVAL = 1600 
+BOSS_SHOT_INTERVAL = 1000 
 BOSS_BULLET_SPEED = 6
 
 # 画像が読み込めない場合の仮表示色
@@ -49,7 +49,7 @@ PLAYER_COLOR = (80, 220, 255)
 ENEMY_COLOR = (255, 100, 100)
 PLAYER_BULLET_COLOR = (255, 245, 100)
 ENEMY_BULLET_COLOR = (255, 120, 80)
-BOSS_COLOR = (0, 0, 0) #  bossの表示色
+BOSS_COLOR = (20, 220, 20) #  bossの表示色
 BOSS_BULLET_COLOR = (255, 0, 0) #  bossの弾の色
 
 # ============================================================
@@ -340,6 +340,7 @@ class Game:
         self.enemy_bullets = []
 
         self.boss = None #  開始時はbossはnone
+        self.boss_spawn_time=3000 # 開始からこのミリ秒数後にスポーン
         self.last_boss_spawn = pygame.time.get_ticks()
 
         self.last_enemy_spawn = pygame.time.get_ticks()
@@ -412,10 +413,10 @@ class Game:
         self.remove_offscreen_objects()
         self.check_collisions()
       
-       # ボスを10秒後に1回だけ出現させる
+       # ボスをn秒後に1回だけ出現させる
         if (
             self.boss is None
-            and now - self.last_boss_spawn >= 3000
+            and now - self.last_boss_spawn >= self.boss_spawn_time
         ):
             self.spawn_boss()
 
@@ -488,7 +489,7 @@ class Game:
                     self.player_bullets.remove(bullet)
                     self.boss.hp -= 1
 
-                    print("ボスHP:", self.boss.hp)
+                    # print("ボスHP:", self.boss.hp)
 
                     # ボスを倒した場合
                     if self.boss.hp <= 0:
