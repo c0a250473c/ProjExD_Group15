@@ -4,7 +4,7 @@ import sys
 import os
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 from pathlib import Path
-
+import time # ゲームクリアで使用
 
 import pygame
 
@@ -312,7 +312,22 @@ class Boss:
     def draw(self, screen):
         screen.blit(self.image, self.rect)    
 
+# ゲームクリア関数
+def game_clear(screen:pygame.Surface):
+    brack=pygame.Surface((SCREEN_WIDTH,SCREEN_HEIGHT))
+    pygame.draw.rect(brack,(0,0,0),pygame.Rect(0,0,SCREEN_WIDTH,SCREEN_HEIGHT))
+    brack.set_alpha(200)
 
+    font=pygame.font.Font(None, 80)
+    txt=font.render("GameClear!!",True,(255,255,255))
+    text_rct=txt.get_rect(center=(SCREEN_WIDTH//2,SCREEN_HEIGHT//2))
+    brack.blit(txt,text_rct)
+
+    screen.blit(brack,(0,0))
+    pygame.display.update()
+    time.sleep(5)
+    pygame.quit()
+    sys.exit()
 
 # ============================================================
 # ゲーム管理クラス
@@ -495,6 +510,7 @@ class Game:
                     if self.boss.hp <= 0:
                         print("BOSS DEFEATED!")
                         self.boss = None
+                        game_clear(self.screen)
 
                     break
         
