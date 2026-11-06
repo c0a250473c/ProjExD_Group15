@@ -393,7 +393,7 @@ class Game:
     def spawn_boss(self):
         if self.boss is None:
             self.boss = Boss()
-            print("ボスが登場しました！")
+            print("ボス登場")
     def update(self):
         now = pygame.time.get_ticks()
         keys = pygame.key.get_pressed()
