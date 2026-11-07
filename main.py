@@ -27,6 +27,7 @@ BACKGROUND_IMAGE = str(BASE_DIR / "assets" / "background.png")
 PLAYER_IMAGE = str(BASE_DIR / "assets" / "player.png")
 ENEMY_IMAGE = str(BASE_DIR / "assets" / "enemy.png")
 BOSS_IMAGE = str(BASE_DIR / "assets" / "boss.png") #boss画像のパス
+STAR_IMAGE = str(BASE_DIR / "assets" / "star.png") #星画像のパス
 BOSS_BGM = str(BASE_DIR / "assets" / "sounds" / "boss_bgm.mp3") #ボス戦bgmのパス
 CLEAR_BGM = str(BASE_DIR / "assets" / "sounds" / "clear_bgm.mp3") #  クリアBGMのパス
 
@@ -321,14 +322,24 @@ def game_clear(screen:pygame.Surface):
     pygame.mixer.music.stop()  # boss_bgm停止
     pygame.mixer.music.load(CLEAR_BGM) #  クリアBGM読み込み
     pygame.mixer.music.play() #  一回だけ流す
+    #  背景を暗く
     brack=pygame.Surface((SCREEN_WIDTH,SCREEN_HEIGHT))
     pygame.draw.rect(brack,(0,0,0),pygame.Rect(0,0,SCREEN_WIDTH,SCREEN_HEIGHT))
     brack.set_alpha(200)
-
-    font=pygame.font.Font(None, 80)
+    #  文字表示
+    font=pygame.font.Font(None, 70)
     txt=font.render("GameClear!!",True,(255,255,0))
     text_rct=txt.get_rect(center=(SCREEN_WIDTH//2,SCREEN_HEIGHT//2))
     brack.blit(txt,text_rct)
+    #  キラキラの星の表示
+    star1_img=pygame.image.load(STAR_IMAGE)
+    star1_img=pygame.transform.scale(star1_img,(50,50))
+    star1_rct=star1_img.get_rect(center=(SCREEN_WIDTH//10,SCREEN_HEIGHT//2))
+    brack.blit(star1_img,star1_rct)
+    star2_img=pygame.image.load(STAR_IMAGE)
+    star2_img=pygame.transform.scale(star2_img,(50,50))
+    star2_rct=star2_img.get_rect(center=((SCREEN_WIDTH - SCREEN_WIDTH//10),SCREEN_HEIGHT//2))
+    brack.blit(star2_img,star2_rct)
 
     screen.blit(brack,(0,0))
     pygame.display.update()
