@@ -252,7 +252,7 @@ class Boss:
             pygame.mixer.music.play(loops=-1) #  ループ再生
             self.rect = self.image.get_rect()
             self.rect.midtop = (x, -BOSS_SIZE[1])
-            self.hp = 5
+            self.hp = 10
             self.last_shot_time = pygame.time.get_ticks()
     
     def load_image(self):
@@ -373,7 +373,7 @@ class Game:
         self.enemy_bullets = []
 
         self.boss = None #  開始時はbossはnone
-        self.boss_spawn_time=3000 # 開始からこのミリ秒数後にスポーン
+        self.boss_spawn_time = 30000 # 開始からこのミリ秒数後にスポーン
         self.last_boss_spawn = pygame.time.get_ticks()
 
         self.last_enemy_spawn = pygame.time.get_ticks()
