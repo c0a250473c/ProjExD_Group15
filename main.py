@@ -1,7 +1,6 @@
 import math
 import random
 import sys
-
 import pygame
 
 
@@ -23,6 +22,10 @@ PLAYER_SPEED = 5
 PLAYER_SHOT_INTERVAL = 250       # ミリ秒
 PLAYER_BULLET_SPEED = 9
 
+#50点ごとに発射感覚を短くする設定
+SHOT_INTERVAL_DECREASE = 25
+MIN_SHOT_INTERVAL = 80
+
 ENEMY_SIZE = (48, 48)
 ENEMY_SPEED = 2
 ENEMY_SPAWN_INTERVAL = 1400      # ミリ秒
@@ -35,11 +38,33 @@ ENEMY_COLOR = (255, 100, 100)
 PLAYER_BULLET_COLOR = (255, 245, 100)
 ENEMY_BULLET_COLOR = (255, 120, 80)
 
+class Score:
+    """
+    ・撃ち落とした爆弾や敵機の数をスコアとして表示する
+      →爆弾: 1点, 敵機: 10点
+    ・そのスコア数によって能力向上
+      →100点を更新する度、弾速やその大きさが変化する
+    """
+    def __init__(self):
+        self.font = pygame.font.Font(None, 50)
+        self.color = (255, 255, 255)
+        self.value = 0
+        
+    def add(self, point):
+        self.value += point
+        
+    def draw(self, screen):
+        image = self.font.render(
+            f"Score: {self.value}", True, self.color
+        )
+        rect = image.get_rect()
+        rect.bottomleft = (15, SCREEN_HEIGHT - 15)
+        screen.blit(image, rect)
+        
 
 # ============================================================
 # 弾クラス
 # ============================================================
-
 class Projectile:
     def __init__(self, x, y, vx, vy, color, radius=5):
         self.x = float(x)
@@ -119,9 +144,9 @@ class Player:
             pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
         )
 
-    def shoot(self, now):
+    def shoot(self, now, shot_interval):
         # 一定時間ごとに弾を発射
-        if now - self.last_shot_time < PLAYER_SHOT_INTERVAL:
+        if now - self.last_shot_time < shot_interval:
             return None
 
         self.last_shot_time = now
@@ -233,16 +258,27 @@ class Game:
 
         self.clock = pygame.time.Clock()
         self.running = True
-
         self.background = self.load_background()
 
-        self.player = Player()
+        self.reset_game()
 
+        # self.enemies = []
+        # self.player_bullets = []
+        # self.enemy_bullets = []
+        # self.explosions = []
+        # self.last_enemy_spawn = pygame.time.get_ticks()
+        
+    def reset_game(self):
+        #ゲーム開始時・再スタート時の初期化
+        self.score = Score()
+        self.player = Player()
+        
         self.enemies = []
         self.player_bullets = []
         self.enemy_bullets = []
-
+        
         self.last_enemy_spawn = pygame.time.get_ticks()
+        self.game_over = False
 
     def load_background(self):
         try:
@@ -263,11 +299,33 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+                
+            #ゲームオーバー時の操作
+            elif event.type == pygame.KEYDOWN and self.game_over:
+                if event.key == pygame.K_r:
+                    self.reset_game()
+                    
+                elif event.key == pygame.K_q or event.key == pygame.K_ESCAPE:
+                    self.running = False
 
     def spawn_enemy(self):
         self.enemies.append(Enemy())
+        
+    def get_shot_interval(self):
+        #50点ごとに発射間隔を短縮
+        level = self.score.value // 50
+        interval = (
+            PLAYER_SHOT_INTERVAL - level * SHOT_INTERVAL_DECREASE
+        )
+        
+        #発射間隔短縮の限界
+        return max(MIN_SHOT_INTERVAL, interval)
 
     def update(self):
+        #ゲームオーバー時はゲーム内の動きを停止
+        if self.game_over:
+            return
+        
         now = pygame.time.get_ticks()
         keys = pygame.key.get_pressed()
 
@@ -276,7 +334,7 @@ class Game:
 
         # スペースキーによる弾の発射
         if keys[pygame.K_SPACE]:
-            bullet = self.player.shoot(now)
+            bullet = self.player.shoot(now, self.get_shot_interval())
 
             if bullet is not None:
                 self.player_bullets.append(bullet)
@@ -332,7 +390,7 @@ class Game:
         ]
 
     def check_collisions(self):
-        # 主人公の弾と敵の当たり判定
+        # 主人公の弾と敵の当たり判定(敵機倒すと10点)
         for bullet in self.player_bullets[:]:
             hit_enemy = None
 
@@ -344,13 +402,76 @@ class Game:
             if hit_enemy is not None:
                 self.player_bullets.remove(bullet)
                 self.enemies.remove(hit_enemy)
+                self.score.add(10)
 
-        # 敵の弾と主人公の当たり判定
+        #敵の攻撃を撃ち落とす(撃ち落とすと1点)
+        for player_bullet in self.player_bullets[:]:
+            hit_enemy_bullet = None
+            
+            for enemy_bullet in self.enemy_bullets:
+                if player_bullet.rect.colliderect(enemy_bullet.rect):
+                    hit_enemy_bullet = enemy_bullet
+                    break
+            
+            if hit_enemy_bullet is not None:
+                self.player_bullets.remove(player_bullet)
+                self.enemy_bullets.remove(hit_enemy_bullet)
+                self.score.add(1)
+
+        # 敵の弾と主人公の当たり判定(ゲームオーバー)
         for bullet in self.enemy_bullets:
             if bullet.rect.colliderect(self.player.rect):
-                print("GAME OVER: 敵の弾が主人公に命中しました。")
-                self.running = False
+                self.game_over = True
                 break
+
+    def draw_game_over(self):
+        # 画面全体に半透明の黒い幕を重ねる
+        overlay = pygame.Surface(
+            (SCREEN_WIDTH, SCREEN_HEIGHT),
+            pygame.SRCALPHA
+        )
+        overlay.fill((0, 0, 0, 180))
+        self.screen.blit(overlay, (0, 0))
+
+        title_font = pygame.font.Font(None, 72)
+        text_font = pygame.font.Font(None, 36)
+
+        title = title_font.render(
+            "GAME OVER", True, (255, 80, 80)
+        )
+
+        final_score = text_font.render(
+            f"Final Score: {self.score.value}",
+            True, (255, 255, 255)
+        )
+
+        retry = text_font.render(
+            "Press R to Restart", True, (255, 255, 255)
+        )
+
+        quit_text = text_font.render(
+            "Press Q to Quit", True, (255, 255, 255)
+        )
+
+        self.screen.blit(
+            title,
+            title.get_rect(center=(SCREEN_WIDTH // 2, 320))
+        )
+
+        self.screen.blit(
+            final_score,
+            final_score.get_rect(center=(SCREEN_WIDTH // 2, 390))
+        )
+
+        self.screen.blit(
+            retry,
+            retry.get_rect(center=(SCREEN_WIDTH // 2, 455))
+        )
+
+        self.screen.blit(
+            quit_text,
+            quit_text.get_rect(center=(SCREEN_WIDTH // 2, 500))
+        )
 
     def draw(self):
         # 背景描画
@@ -370,6 +491,13 @@ class Game:
 
         for bullet in self.enemy_bullets:
             bullet.draw(self.screen)
+            
+        #スコア表示    
+        self.score.draw(self.screen)
+        
+        #ゲームオーバー画面
+        if self.game_over:
+            self.draw_game_over()
 
         pygame.display.flip()
 
