@@ -6,7 +6,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 from pathlib import Path
 
 
-import pygame
+import pygame as pg
 
 
 # ============================================================
@@ -67,7 +67,7 @@ class Projectile:
         self.color = color
         self.radius = radius
 
-        self.rect = pygame.Rect(0, 0, radius * 2, radius * 2)
+        self.rect = pg.Rect(0, 0, radius * 2, radius * 2)
         self.rect.center = (round(self.x), round(self.y))
 
     def update(self):
@@ -76,7 +76,7 @@ class Projectile:
         self.rect.center = (round(self.x), round(self.y))
 
     def draw(self, screen):
-        pygame.draw.circle(
+        pg.draw.circle(
             screen,
             self.color,
             self.rect.center,
@@ -99,14 +99,14 @@ class Player:
         self.last_dodeka_time = 0
     def load_image(self):
         try:
-            image = pygame.image.load(PLAYER_IMAGE).convert_alpha()
-            return pygame.transform.smoothscale(image, PLAYER_SIZE)
+            image = pg.image.load(PLAYER_IMAGE).convert_alpha()
+            return pg.transform.smoothscale(image, PLAYER_SIZE)
 
-        except (pygame.error, FileNotFoundError):
+        except (pg.error, FileNotFoundError):
             print("主人公画像が見つかりません。仮画像を使用します。")
 
-            surface = pygame.Surface(PLAYER_SIZE, pygame.SRCALPHA)
-            pygame.draw.polygon(
+            surface = pg.Surface(PLAYER_SIZE, pg.SRCALPHA)
+            pg.draw.polygon(
                 surface,
                 PLAYER_COLOR,
                 [(32, 0), (4, 58), (32, 46), (60, 58)]
@@ -122,16 +122,16 @@ class Player:
         dy = 0
 
         # 矢印キー・WASDによる移動
-        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+        if keys[pg.K_LEFT] or keys[pg.K_a]:
             dx -= current_speed # 変更
 
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+        if keys[pg.K_RIGHT] or keys[pg.K_d]:
             dx += current_speed # 変更
 
-        if keys[pygame.K_UP] or keys[pygame.K_w]:
+        if keys[pg.K_UP] or keys[pg.K_w]:
             dy -= current_speed # 変更
 
-        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+        if keys[pg.K_DOWN] or keys[pg.K_s]:
             dy += current_speed # 変更
 
         self.rect.x += dx
@@ -139,7 +139,7 @@ class Player:
 
         # 画面外に出ないように制限
         self.rect.clamp_ip(
-            pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
+            pg.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
         )
 
     def shoot(self, now):
@@ -190,28 +190,28 @@ class Enemy:
         self.rect = self.image.get_rect()
         self.rect.midtop = (x, -ENEMY_SIZE[1])
 
-        self.last_shot_time = pygame.time.get_ticks()
+        self.last_shot_time = pg.time.get_ticks()
 
     def load_image(self):
         try:
-            image = pygame.image.load(
+            image = pg.image.load(
                 ENEMY_IMAGE
             ).convert_alpha()
 
-            return pygame.transform.smoothscale(
+            return pg.transform.smoothscale(
                 image,
                 ENEMY_SIZE
             )
 
-        except (pygame.error, FileNotFoundError):
+        except (pg.error, FileNotFoundError):
             print("敵画像が見つかりません。仮画像を使用します。")
 
-            surface = pygame.Surface(
+            surface = pg.Surface(
                 ENEMY_SIZE,
-                pygame.SRCALPHA
+                pg.SRCALPHA
             )
 
-            pygame.draw.ellipse(
+            pg.draw.ellipse(
                 surface,
                 ENEMY_COLOR,
                 surface.get_rect()
@@ -259,15 +259,15 @@ class Enemy:
 
 class Game:
     def __init__(self):
-        pygame.init()
+        pg.init()
 
-        pygame.display.set_caption(WINDOW_TITLE)
+        pg.display.set_caption(WINDOW_TITLE)
 
-        self.screen = pygame.display.set_mode(
+        self.screen = pg.display.set_mode(
             (SCREEN_WIDTH, SCREEN_HEIGHT)
         )
 
-        self.clock = pygame.time.Clock()
+        self.clock = pg.time.Clock()
         self.running = True
 
         self.background = self.load_background()
@@ -278,46 +278,46 @@ class Game:
         self.player_bullets = []
         self.enemy_bullets = []
 
-        self.last_enemy_spawn = pygame.time.get_ticks()
+        self.last_enemy_spawn = pg.time.get_ticks()
 
     def load_background(self):
         try:
-            image = pygame.image.load(
+            image = pg.image.load(
                 BACKGROUND_IMAGE
             ).convert()
 
-            return pygame.transform.scale(
+            return pg.transform.scale(
                 image,
                 (SCREEN_WIDTH, SCREEN_HEIGHT)
             )
 
-        except (pygame.error, FileNotFoundError):
+        except (pg.error, FileNotFoundError):
             print("背景画像が見つかりません。単色背景を使用します。")
             return None
 
     def handle_events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
                 self.running = False
 
     def spawn_enemy(self):
         self.enemies.append(Enemy())
 
     def update(self):
-        now = pygame.time.get_ticks()
-        keys = pygame.key.get_pressed()
+        now = pg.time.get_ticks()
+        keys = pg.key.get_pressed()
 
         # 主人公の移動
         self.player.update(keys)
 
         # スペースキーによる弾の発射
-        if keys[pygame.K_SPACE]:
+        if keys[pg.K_SPACE]:
             bullet = self.player.shoot(now)
 
             if bullet is not None:
                 self.player_bullets.append(bullet)
 
-        if keys[pygame.K_t ]:# tキーによるどでか弾の発射
+        if keys[pg.K_t ]:# tキーによるどでか弾の発射
             dodeka_bullet = self.player.shoot_dodeka(now)
 
             if dodeka_bullet is not None:
@@ -397,9 +397,9 @@ class Game:
     def draw_stamina_bar(self):
         bar_width = 200 * (self.player.stamina / MAX_STAMINA)
         bar_color = (150, 255, 100) if self.player.stamina >= UTSU_THRESHOLD else (128, 0, 128)
-        pygame.draw.rect(self.screen, (50, 50, 50), (10, SCREEN_HEIGHT - 30, 200, 15))
+        pg.draw.rect(self.screen, (50, 50, 50), (10, SCREEN_HEIGHT - 30, 200, 15))
         if bar_width > 0:
-            pygame.draw.rect(self.screen, bar_color, (10, SCREEN_HEIGHT - 30, bar_width, 15))
+            pg.draw.rect(self.screen, bar_color, (10, SCREEN_HEIGHT - 30, bar_width, 15))
             # 現在のスタミナ残量を示すゲージ（バー）」を描画するための処理
 
     def draw(self):
@@ -423,7 +423,7 @@ class Game:
 
         self.draw_stamina_bar()
 
-        pygame.display.flip()
+        pg.display.flip()
 
     def run(self):
         while self.running:
@@ -433,7 +433,7 @@ class Game:
             self.update()
             self.draw()
 
-        pygame.quit()
+        pg.quit()
         sys.exit()
 
 
