@@ -2,6 +2,8 @@ import math
 import random
 import sys
 from pathlib import Path
+
+
 import pygame as pg
 
 
@@ -127,6 +129,16 @@ class Score:
         image = self.font.render(f"Score: {self.value}", True, (255, 255, 255))
         rect = image.get_rect(bottomleft=(15, SCREEN_HEIGHT - 60))
         screen.blit(image, rect)
+# どでか弾と鬱スタミナの数字
+MAX_STAMINA = 100.0
+UTSU_THRESHOLD = 30.0
+UTSU_SPEED = 2.0
+STAMINA_RECOVERY = 0.15
+DODEKA_COST = 50.0
+DODEKA_RADIUS = 40
+DODEKA_COLOR = (255, 50, 50)
+DODEKA_INTERVAL = 500
+
 
 # ============================================================
 # 弾クラス
@@ -134,12 +146,40 @@ class Score:
 class Projectile(pg.sprite.Sprite):
     def __init__(self, x, y, vx, vy, color, radius=5, kind="normal"):
         super().__init__()
+
         self.vx = float(vx)
         self.vy = float(vy)
         self.kind = kind
-        self.image = pg.Surface((radius * 2, radius * 2), pg.SRCALPHA)
-        pg.draw.circle(self.image, color, (radius, radius), radius)
-        self.rect = self.image.get_rect(center=(round(x), round(y)))
+
+        self.image = pg.Surface(
+            (radius * 2, radius * 2),
+            pg.SRCALPHA
+        )
+
+        pg.draw.circle(
+            self.image,
+            color,
+            (radius, radius),
+            radius
+        )
+
+        self.rect = self.image.get_rect(
+            center=(round(x), round(y))
+        )
+
+        self.color = color
+        self.radius = radius
+
+    def update(self):
+        self.rect.x += round(self.vx)
+        self.rect.y += round(self.vy)
+
+        if (self.rect.bottom < 0 or self.rect.top > SCREEN_HEIGHT
+                or self.rect.right < 0 or self.rect.left > SCREEN_WIDTH):
+            self.kill()
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect) 
 
     def update(self):
         self.rect.x += round(self.vx)
@@ -147,6 +187,8 @@ class Projectile(pg.sprite.Sprite):
         if (self.rect.bottom < 0 or self.rect.top > SCREEN_HEIGHT
                 or self.rect.right < 0 or self.rect.left > SCREEN_WIDTH):
             self.kill()
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
 
 # ============================================================
 # アイテムクラス
@@ -154,14 +196,23 @@ class Projectile(pg.sprite.Sprite):
 class Item(pg.sprite.Sprite):
     def __init__(self, x, y, item_type):
         super().__init__()
+
         self.type = item_type
+
         self.image = load_scaled_image(
-            ITEM_IMAGES[item_type], ITEM_SIZE, ITEM_COLORS[item_type]
+            ITEM_IMAGES[item_type],
+            ITEM_SIZE,
+            ITEM_COLORS[item_type]
         )
+
+        # アイテムの位置を設定
         self.rect = self.image.get_rect(center=(x, y))
 
     def update(self):
+        # アイテムを下方向に移動
         self.rect.y += ITEM_SPEED
+
+        # 画面外に出たら削除
         if self.rect.top > SCREEN_HEIGHT:
             self.kill()
 
@@ -178,8 +229,29 @@ class Player(pg.sprite.Sprite):
         self.stock_item = None
         self.invincible_end_time = 0
         self.rapid_fire_end_time = 0
+        self.stamina = MAX_STAMINA # タミナを満タンにして、大技をすぐに撃てる状態にセットするコード
+        self.last_dodeka_time = 0
+    def load_image(self):
+        try:
+            image = pg.image.load(PLAYER_IMAGE).convert_alpha()
+            return pg.transform.smoothscale(image, PLAYER_SIZE)
+
+        except (pg.error, FileNotFoundError):
+            print("主人公画像が見つかりません。仮画像を使用します。")
+
+            surface = pg.Surface(PLAYER_SIZE, pg.SRCALPHA)
+            pg.draw.polygon(
+                surface,
+                PLAYER_COLOR,
+                [(32, 0), (4, 58), (32, 46), (60, 58)]
+            )
+            return surface
 
     def update(self, keys):
+        if self.stamina < MAX_STAMINA:
+            self.stamina = min(self.stamina + STAMINA_RECOVERY, MAX_STAMINA)
+        current_speed = PLAYER_SPEED if self.stamina >= UTSU_THRESHOLD else UTSU_SPEED
+        # このコードは、ゲームが動いている間、毎フレーム（常に）キャラクターの状態を更新する処理の一部
         dx = 0
         dy = 0
         if keys[pg.K_LEFT] or keys[pg.K_a]:
@@ -190,18 +262,58 @@ class Player(pg.sprite.Sprite):
             dy -= PLAYER_SPEED
         if keys[pg.K_DOWN] or keys[pg.K_s]:
             dy += PLAYER_SPEED
+
+        # 矢印キー・WASDによる移動
+        if keys[pg.K_LEFT] or keys[pg.K_a]:
+            dx -= current_speed # 変更
+
+        if keys[pg.K_RIGHT] or keys[pg.K_d]:
+            dx += current_speed # 変更
+
+        if keys[pg.K_UP] or keys[pg.K_w]:
+            dy -= current_speed # 変更
+
+        if keys[pg.K_DOWN] or keys[pg.K_s]:
+            dy += current_speed # 変更
+
         self.rect.x += dx
         self.rect.y += dy
         self.rect.clamp_ip(pg.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
 
     def shoot(self, now, shot_interval):
         if now - self.last_shot_time < shot_interval:
+        # 画面外に出ないように制限
+            self.rect.clamp_ip(
+            pg.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
+        )
+
+    def shoot(self, now, shot_interval):
+    # 一定時間ごとに弾を発射
+        if now - self.last_shot_time < shot_interval:
             return None
+
         self.last_shot_time = now
         return Projectile(
-            self.rect.centerx, self.rect.top, 0, -PLAYER_BULLET_SPEED,
-            PLAYER_BULLET_COLOR
-        )
+        self.rect.centerx, self.rect.top, 0, -PLAYER_BULLET_SPEED,
+        PLAYER_BULLET_COLOR
+    )
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
+    def shoot_dodeka(self, now):
+        if now - self.last_dodeka_time < DODEKA_INTERVAL:
+            return None
+        
+        if  self.stamina >= DODEKA_COST:
+            self.stamina -= DODEKA_COST
+            self.last_dodeka_time = now
+            return Projectile(
+                self.rect.centerx, self.rect.top, 0,
+                -PLAYER_BULLET_SPEED + 2, DODEKA_COLOR, radius=DODEKA_RADIUS
+            )
+        return None
+        # 時間経過とスタミナの量の2つの条件を満たした時スタミナをガッツリ消費し巨大な弾を発射する
+
 
 # ============================================================
 # 敵クラス
@@ -218,6 +330,34 @@ class Enemy(pg.sprite.Sprite):
         )
         self.last_shot_time = pg.time.get_ticks()
 
+        self.last_shot_time = pg.time.get_ticks()
+
+    def load_image(self):
+        try:
+            image = pg.image.load(
+                ENEMY_IMAGE
+            ).convert_alpha()
+
+            return pg.transform.smoothscale(
+                image,
+                ENEMY_SIZE
+            )
+
+        except (pg.error, FileNotFoundError):
+            print("敵画像が見つかりません。仮画像を使用します。")
+
+            surface = pg.Surface(
+                ENEMY_SIZE,
+                pg.SRCALPHA
+            )
+
+            pg.draw.ellipse(
+                surface,
+                ENEMY_COLOR,
+                surface.get_rect()
+            )
+
+            return surface
     def update(self):
         self.rect.y += self.speed
         if self.rect.top > SCREEN_HEIGHT:
@@ -336,6 +476,13 @@ class Game:
         pg.font.init()
         pg.display.set_caption(WINDOW_TITLE)
         self.screen = pg.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+        pg.display.set_caption(WINDOW_TITLE)
+
+        self.screen = pg.display.set_mode(
+            (SCREEN_WIDTH, SCREEN_HEIGHT)
+        )
+
         self.clock = pg.time.Clock()
         self.running = True
         self.font = pg.font.SysFont(None, 28)
@@ -377,6 +524,30 @@ class Game:
             level = self.score.value // 50
             interval -= level * SHOT_INTERVAL_DECREASE
         return max(MIN_SHOT_INTERVAL, interval)
+        self.background = self.load_background()
+
+        self.player = Player()
+
+        self.enemies = []
+        self.player_bullets = []
+        self.enemy_bullets = []
+
+        self.last_enemy_spawn = pg.time.get_ticks()
+
+    def load_background(self):
+        try:
+            image = pg.image.load(
+                BACKGROUND_IMAGE
+            ).convert()
+
+            return pg.transform.scale(
+                image,
+                (SCREEN_WIDTH, SCREEN_HEIGHT)
+            )
+
+        except (pg.error, FileNotFoundError):
+            print("背景画像が見つかりません。単色背景を使用します。")
+            return None
 
     def handle_events(self):
         for event in pg.event.get():
@@ -411,16 +582,24 @@ class Game:
     def damage_player(self, now):
         if now < self.player.invincible_end_time:
             return
+
         self.player.hp -= 1
         self.life.hp_damage(34)
         self.player.invincible_end_time = now + 1500
+
+        print("プレイヤーHP:", self.player.hp)
+        print("ライフ:", self.life.hp)
+
         if self.player.hp <= 0 or self.life.hp <= 0:
+            print("GAME OVERになりました！")
             self.game_over = True
             pg.mixer.music.stop()
 
     def update(self):
         if self.game_over:
             return
+        now = pg.time.get_ticks()
+        keys = pg.key.get_pressed()
 
         now = pg.time.get_ticks()
         keys = pg.key.get_pressed()
@@ -428,11 +607,22 @@ class Game:
 
         if keys[pg.K_SPACE]:
             bullet = self.player.shoot(now, self.get_shot_interval(now))
+        # スペースキーによる弾の発射
+
             if bullet is not None:
                 self.player_bullets.add(bullet)
 
         is_stunned = now < self.global_stun_end_time
         if not is_stunned and now - self.last_enemy_spawn >= ENEMY_SPAWN_INTERVAL:
+
+            if keys[pg.K_t ]:# tキーによるどでか弾の発射
+                dodeka_bullet = self.player.shoot_dodeka(now)
+
+                if dodeka_bullet is not None:
+                    self.player_bullets.add(dodeka_bullet)
+ 
+        # 一定時間ごとに敵を生成
+        if now - self.last_enemy_spawn >= ENEMY_SPAWN_INTERVAL:
             self.spawn_enemy()
             self.last_enemy_spawn = now
 
@@ -612,6 +802,14 @@ class Game:
         pg.display.flip()
         pg.time.delay(3000)
 
+    def draw_stamina_bar(self):
+        bar_width = 200 * (self.player.stamina / MAX_STAMINA)
+        bar_color = (150, 255, 100) if self.player.stamina >= UTSU_THRESHOLD else (128, 0, 128)
+        pg.draw.rect(self.screen, (50, 50, 50), (10, SCREEN_HEIGHT - 30, 200, 15))
+        if bar_width > 0:
+            pg.draw.rect(self.screen, bar_color, (10, SCREEN_HEIGHT - 30, bar_width, 15))
+            # 現在のスタミナ残量を示すゲージ（バー）」を描画するための処理
+
     def draw(self):
         now = pg.time.get_ticks()
         if self.background is not None:
@@ -633,6 +831,13 @@ class Game:
         self.draw_damage_effect()
         self.score.draw(self.screen)
 
+        
+        for bullet in self.enemy_bullets:
+            bullet.draw(self.screen)
+
+        self.draw_stamina_bar()
+
+        # ゲームオーバーならゲームオーバー画面を表示
         if self.game_over:
             self.draw_game_over()
 
