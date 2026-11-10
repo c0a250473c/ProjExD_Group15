@@ -33,13 +33,13 @@ CLEAR_BGM = str(BASE_DIR / "assets" / "sounds" / "clear_bgm.mp3") #  クリアBG
 
 PLAYER_SIZE = (64, 64)
 PLAYER_SPEED = 5
-PLAYER_SHOT_INTERVAL = 250       # ミリ秒
+PLAYER_SHOT_INTERVAL = 250  # ミリ秒
 PLAYER_BULLET_SPEED = 9
 
 ENEMY_SIZE = (48, 48)
 ENEMY_SPEED = 2
-ENEMY_SPAWN_INTERVAL = 1400      # ミリ秒
-ENEMY_SHOT_INTERVAL = 1600       # ミリ秒
+ENEMY_SPAWN_INTERVAL = 1400  # ミリ秒
+ENEMY_SHOT_INTERVAL = 1600   # ミリ秒
 ENEMY_BULLET_SPEED = 4
 
 #bossの設定
@@ -236,6 +236,46 @@ class Enemy:
     def draw(self, screen):
         screen.blit(self.image, self.rect)
 
+# ============================================================
+# 体力ゲージクラス
+# ============================================================
+
+class Life:
+    def __init__(self):
+        self.hp = 100
+        self.max_hp = 100
+
+    # ダメージ処理
+    def hp_damage(self, damage):
+        self.hp -= damage
+        if self.hp < 0:
+            self.hp = 0
+
+    # 体力ゲージ描画
+    def draw(self, screen):
+        x = 20
+        y = 20
+        width = 200
+        height = 20
+
+        # ゲージの背景
+        pygame.draw.rect(screen, (100, 100, 100),(x, y, width, height))
+
+        # HPによって色を変更
+        if self.hp > 50:
+            color = (0, 255, 0)
+        elif self.hp > 20:
+            color = (255, 255, 0)
+        else:
+            color = (255, 0, 0)
+
+        # HPゲージ
+        pygame.draw.rect(screen, color,(x, y, width * self.hp / self.max_hp, height))
+
+        # HPの数値
+        font = pygame.font.SysFont(None, 30)
+        text = font.render(f"HP: {self.hp}/{self.max_hp}", True, (255, 255, 255))
+        screen.blit(text, (x, y + 25))
 
 # ============================================================
 # ボスクラス
@@ -354,7 +394,7 @@ def game_clear(screen:pygame.Surface):
 class Game:
     def __init__(self):
         pygame.init()
-
+        self.life = Life()
         pygame.display.set_caption(WINDOW_TITLE)
 
         self.screen = pygame.display.set_mode(
@@ -400,6 +440,7 @@ class Game:
 
     def spawn_enemy(self):
         self.enemies.append(Enemy())
+
 
     def spawn_boss(self):
         if self.boss is None:
@@ -506,10 +547,71 @@ class Game:
         # 敵の弾と主人公の当たり判定
         for bullet in self.enemy_bullets:
             if bullet.rect.colliderect(self.player.rect):
-                print("GAME OVER: 敵の弾が主人公に命中しました。")
-                self.running = False
+                # 当たった弾を削除
+                self.enemy_bullets.remove(bullet)
+
+                # 体力を10減らす
+                self.life.hp_damage(10)
+
+                # HPが0になったらゲームオーバー
+                if self.life.hp <= 0:
+                    print("GAME OVER")
+                    self.running = False
                 break
 
+                # print("GAME OVER: 敵の弾が主人公に命中しました。")
+                # self.running = False
+                # break
+    def draw_damage_effect(self):
+        if self.life.hp <= 10:
+            x = self.player.rect.centerx
+            y = self.player.rect.centery
+
+            # 煙のアニメーション
+            t = pygame.time.get_ticks() / 300
+
+            hai = pygame.Surface(
+                self.screen.get_size(), pygame.SRCALPHA
+            )
+
+            for i in range(3):
+                smoke_x = x + math.sin(t + i * 2) * 15
+                smoke_y = y - 35 - i * 15 - abs(math.sin(t + i)) * 10
+
+                pygame.draw.circle(
+                    hai,
+                    (130, 130, 130, 100),
+                    (int(smoke_x), int(smoke_y)),
+                    12 + i * 3
+                )
+
+            self.screen.blit(hai, (0, 0))
+
+            # ひび割れ
+            pygame.draw.lines(
+                self.screen,
+                (40, 40, 40),
+                False,
+                [
+                    (x, y - 20),
+                    (x - 8, y - 5),
+                    (x + 3, y + 2),
+                    (x - 5, y + 18)
+                ],
+                3
+            )
+
+            pygame.draw.lines(
+                self.screen,
+                (40, 40, 40),
+                False,
+                [
+                    (x - 8, y - 5),
+                    (x - 18, y - 12),
+                    (x - 22, y - 22)
+                ],
+                2
+            )
         # 主人公の弾とボスの当たり判定
         if self.boss is not None:
 
@@ -550,6 +652,17 @@ class Game:
         for bullet in self.enemy_bullets:
             bullet.draw(self.screen)
 
+        self.life.draw(self.screen)
+        self.draw_damage_effect()
+
+        for enemy in self.enemies:
+            enemy.draw(self.screen)
+
+        for bullet in self.player_bullets:
+            bullet.draw(self.screen)
+
+        for bullet in self.enemy_bullets:
+            bullet.draw(self.screen)
         # ボスの描画
         if self.boss is not None:
             self.boss.draw(self.screen)
