@@ -39,6 +39,14 @@ ENEMY_SPEED = 2
 ENEMY_SPAWN_INTERVAL = 1400
 ENEMY_SHOT_INTERVAL = 1600
 ENEMY_BULLET_SPEED = 4
+ZIGZAG_ENEMY_SPEED_X=3
+ZIGZAG_ENEMY_RATE=0.25
+ARMOR_ENEMY_SIZE=(64,64)
+ARMOR_ENEMY_SPEED=1
+ARMOR_ENEMY_RATE=0.15
+ARMOR_WEAK_KIND="big"
+
+
 
 BOSS_SIZE = (100, 100)
 BOSS_SPAWN_TIME = 30000
@@ -124,10 +132,11 @@ class Score:
 # 弾クラス
 # ============================================================
 class Projectile(pg.sprite.Sprite):
-    def __init__(self, x, y, vx, vy, color, radius=5):
+    def __init__(self, x, y, vx, vy, color, radius=5, kind="normal"):
         super().__init__()
         self.vx = float(vx)
         self.vy = float(vy)
+        self.kind = kind
         self.image = pg.Surface((radius * 2, radius * 2), pg.SRCALPHA)
         pg.draw.circle(self.image, color, (radius, radius), radius)
         self.rect = self.image.get_rect(center=(round(x), round(y)))
@@ -201,6 +210,7 @@ class Enemy(pg.sprite.Sprite):
     def __init__(self):
         super().__init__()
         self.image = load_scaled_image(ENEMY_IMAGE, ENEMY_SIZE, ENEMY_COLOR, "ellipse")
+        self.speed = ENEMY_SPEED
         self.rect = self.image.get_rect()
         self.rect.midtop = (
             random.randint(ENEMY_SIZE[0] // 2, SCREEN_WIDTH - ENEMY_SIZE[0] // 2),
@@ -209,9 +219,14 @@ class Enemy(pg.sprite.Sprite):
         self.last_shot_time = pg.time.get_ticks()
 
     def update(self):
-        self.rect.y += ENEMY_SPEED
+        self.rect.y += self.speed
         if self.rect.top > SCREEN_HEIGHT:
             self.kill()
+
+    def hit(self, bullet):
+        return True
+    
+        
 
     def shoot(self, now, player_center):
         if now - self.last_shot_time < ENEMY_SHOT_INTERVAL:
@@ -289,6 +304,28 @@ class Boss:
 
     def draw(self, screen):
         screen.blit(self.image, self.rect)
+class ZigZagEnemy(Enemy):
+    def __init__(self):
+        super().__init__()
+        pg.draw.rect(self.image,(80,255,80),self.image.get_rect(),3)
+        self.vx=random.choice([-ZIGZAG_ENEMY_SPEED_X,ZIGZAG_ENEMY_SPEED_X])
+
+    def update(self)->None:
+        super().update()
+        self.rect.x+=self.vx
+        if self.rect.left<0 or self.rect.right>SCREEN_WIDTH:
+            self.vx*=-1
+
+class ArmorEnemy(Enemy):
+    def __init__(self):
+
+        super().__init__()
+        self.image=pg.transform.smoothscale(self.image,ARMOR_ENEMY_SIZE)
+        self.rect=self.image.get_rect(midtop=self.rect.midtop)
+        pg.draw.rect(self.image,(220,220,220),self.image.get_rect(),5)
+        self.speed=ARMOR_ENEMY_SPEED
+    def hit(self,bullet:Projectile)->bool:
+        return bullet.kind==ARMOR_WEAK_KIND
 
 # ============================================================
 # ゲーム管理クラス
@@ -396,7 +433,7 @@ class Game:
 
         is_stunned = now < self.global_stun_end_time
         if not is_stunned and now - self.last_enemy_spawn >= ENEMY_SPAWN_INTERVAL:
-            self.enemies.add(Enemy())
+            self.spawn_enemy()
             self.last_enemy_spawn = now
 
         self.enemies.update()
@@ -406,9 +443,16 @@ class Game:
                 if bullet is not None:
                     self.enemy_bullets.add(bullet)
 
+
         self.player_bullets.update()
         self.enemy_bullets.update()
         self.items.update()
+
+            # if hit_enemy is not None:
+            #     self.player_bullets.remove(bullet)
+            #     if hit_enemy.hit(bullet):
+            #         self.enemies.remove(hit_enemy)
+
 
         if self.boss is None and now - self.start_time >= BOSS_SPAWN_TIME:
             self.boss = Boss()
@@ -429,16 +473,20 @@ class Game:
 
     def check_collisions(self, now):
         # 自機の弾と敵機：敵機1機につき10点
-        hits = pg.sprite.groupcollide(
-            self.enemies, self.player_bullets, True, True
-        )
-        for enemy in hits:
-            self.score.add(10)
-            if random.random() < ITEM_DROP_RATE:
-                item_type = random.choice(
-                    [ITEM_HEAL, ITEM_STUN, ITEM_INVINCIBLE, ITEM_RAPID]
-                )
-                self.items.add(Item(enemy.rect.centerx, enemy.rect.centery, item_type))
+                # 自機の弾と敵機：敵機1機につき10点
+        for bullet in list(self.player_bullets):
+            hit_enemies = pg.sprite.spritecollide(bullet, self.enemies, False)
+            if hit_enemies:
+                enemy = hit_enemies[0]
+                bullet.kill()
+                if enemy.hit(bullet):
+                    enemy.kill()
+                    self.score.add(10)
+                    if random.random() < ITEM_DROP_RATE:
+                        item_type = random.choice(
+                            [ITEM_HEAL, ITEM_STUN, ITEM_INVINCIBLE, ITEM_RAPID]
+                        )
+                        self.items.add(Item(enemy.rect.centerx, enemy.rect.centery, item_type))
 
         # 自機の弾で敵弾を撃ち落とす：1発につき1点
         bullet_hits = pg.sprite.groupcollide(
@@ -589,7 +637,15 @@ class Game:
             self.draw_game_over()
 
         pg.display.flip()
-
+    def spawn_enemy(self):    
+        r=random.random()
+        if r<ARMOR_ENEMY_RATE:
+            self.enemies.add(ArmorEnemy())
+        elif r<ARMOR_ENEMY_RATE+ZIGZAG_ENEMY_RATE:
+            self.enemies.add(ZigZagEnemy())
+        else:
+            self.enemies.add(Enemy())    
+             
     def run(self):
         while self.running:
             self.clock.tick(FPS)
