@@ -317,7 +317,7 @@ class Game:
             if bullet is not None:
                 self.player_bullets.append(bullet)
 
-        if keys[pygame.K_x]:# Xキーによるどでか弾の発射
+        if keys[pygame.K_t ]:# tキーによるどでか弾の発射
             dodeka_bullet = self.player.shoot_dodeka(now)
 
             if dodeka_bullet is not None:
