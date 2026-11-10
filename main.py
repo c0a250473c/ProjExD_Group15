@@ -2,13 +2,13 @@ import math
 import random
 import sys
 import os
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+import time
 from pathlib import Path
-import time # ゲームクリアで使用
 
-import pygame
+import pygame as pg
 
-pygame.mixer.init() # 初期化（BGM用）
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+pg.mixer.init() # 初期化（BGM用）
 
 # ============================================================
 # 設定
@@ -26,25 +26,26 @@ BASE_DIR = Path(__file__).resolve().parent
 BACKGROUND_IMAGE = str(BASE_DIR / "assets" / "background.png")
 PLAYER_IMAGE = str(BASE_DIR / "assets" / "player.png")
 ENEMY_IMAGE = str(BASE_DIR / "assets" / "enemy.png")
-BOSS_IMAGE = str(BASE_DIR / "assets" / "boss.png") #boss画像のパス
-STAR_IMAGE = str(BASE_DIR / "assets" / "star.png") #星画像のパス
-BOSS_BGM = str(BASE_DIR / "assets" / "sounds" / "boss_bgm.mp3") #ボス戦bgmのパス
-CLEAR_BGM = str(BASE_DIR / "assets" / "sounds" / "clear_bgm.mp3") #  クリアBGMのパス
+BOSS_IMAGE = str(BASE_DIR / "assets" / "boss.png") 
+STAR_IMAGE = str(BASE_DIR / "assets" / "star.png") 
+BOSS_BGM = str(BASE_DIR / "assets" / "sounds" / "boss_bgm.mp3") 
+CLEAR_BGM = str(BASE_DIR / "assets" / "sounds" / "clear_bgm.mp3") 
 
 PLAYER_SIZE = (64, 64)
 PLAYER_SPEED = 5
-PLAYER_SHOT_INTERVAL = 250  # ミリ秒
+PLAYER_SHOT_INTERVAL = 250  
 PLAYER_BULLET_SPEED = 9
+PLAYER_MAX_HP = 3                
 
 ENEMY_SIZE = (48, 48)
 ENEMY_SPEED = 2
-ENEMY_SPAWN_INTERVAL = 1400  # ミリ秒
-ENEMY_SHOT_INTERVAL = 1600   # ミリ秒
+ENEMY_SPAWN_INTERVAL = 1400  
+ENEMY_SHOT_INTERVAL = 1600   
 ENEMY_BULLET_SPEED = 4
 
-#bossの設定
+# bossの設定
 BOSS_SIZE = (100, 100)
-BOSS_SPAWN_INTERVAL = 1400      # ミリ秒
+BOSS_SPAWN_INTERVAL = 1400      
 BOSS_SHOT_INTERVAL = 1000 
 BOSS_BULLET_SPEED = 6
 
@@ -53,169 +54,179 @@ PLAYER_COLOR = (80, 220, 255)
 ENEMY_COLOR = (255, 100, 100)
 PLAYER_BULLET_COLOR = (255, 245, 100)
 ENEMY_BULLET_COLOR = (255, 120, 80)
-BOSS_COLOR = (20, 220, 20) #  bossの表示色
-BOSS_BULLET_COLOR = (255, 0, 0) #  bossの弾の色
+BOSS_COLOR = (20, 220, 20) 
+BOSS_BULLET_COLOR = (255, 0, 0) 
+
+# アイテム設定
+ITEM_SIZE = (32, 32)
+ITEM_SPEED = 2
+ITEM_DROP_RATE = 0.20 
+
+# アイテムの種類
+ITEM_HEAL = 0        
+ITEM_STUN = 1        
+ITEM_INVINCIBLE = 2  
+ITEM_RAPID = 3       
+
+# アイテムの画像パス
+ITEM_IMAGES = {
+    ITEM_HEAL: "assets/item_heal.png",
+    ITEM_STUN: "assets/item_stun.png",
+    ITEM_INVINCIBLE: "assets/item_invincible.png",
+    ITEM_RAPID: "assets/item_rapid.png"
+}
+
+# 画像が見つからない場合の仮表示色
+ITEM_COLORS = {
+    ITEM_HEAL: (50, 255, 50),       
+    ITEM_STUN: (255, 255, 50),      
+    ITEM_INVINCIBLE: (255, 100, 255),
+    ITEM_RAPID: (50, 255, 255)      
+}
+
+ITEM_NAMES = {
+    ITEM_HEAL: "HEAL",
+    ITEM_STUN: "STUN",
+    ITEM_INVINCIBLE: "INVINCIBLE",
+    ITEM_RAPID: "RAPID FIRE"
+}
+
 
 # ============================================================
 # 弾クラス
 # ============================================================
-
-class Projectile:
-    def __init__(self, x, y, vx, vy, color, radius=5):
+class Projectile(pg.sprite.Sprite):
+    def __init__(self, x: float, y: float, vx: float, vy: float, color: tuple[int, int, int], radius: int = 5) -> None:
+        super().__init__()
         self.x = float(x)
         self.y = float(y)
         self.vx = float(vx)
         self.vy = float(vy)
-        self.color = color
-        self.radius = radius
+        
+        self.image = pg.Surface((radius * 2, radius * 2), pg.SRCALPHA)
+        pg.draw.circle(self.image, color, (radius, radius), radius)
+        self.rect = self.image.get_rect(center=(round(self.x), round(self.y)))
 
-        self.rect = pygame.Rect(0, 0, radius * 2, radius * 2)
-        self.rect.center = (round(self.x), round(self.y))
-
-    def update(self):
+    def update(self) -> None:
         self.x += self.vx
         self.y += self.vy
         self.rect.center = (round(self.x), round(self.y))
+        
+        if self.rect.bottom < 0 or self.rect.top > SCREEN_HEIGHT or \
+           self.rect.right < 0 or self.rect.left > SCREEN_WIDTH:
+            self.kill()
 
-    def draw(self, screen):
-        pygame.draw.circle(
-            screen,
-            self.color,
-            self.rect.center,
-            self.radius
-        )
+
+# ============================================================
+# アイテムクラス
+# ============================================================
+class Item(pg.sprite.Sprite):
+    def __init__(self, x: int, y: int, item_type: int) -> None:
+        super().__init__()
+        self.type = item_type
+        self.image = self.load_image()
+        self.rect = self.image.get_rect(center=(x, y))
+
+    def load_image(self) -> pg.Surface:
+        try:
+            image = pg.image.load(ITEM_IMAGES[self.type]).convert_alpha()
+            return pg.transform.smoothscale(image, ITEM_SIZE)
+        except (pg.error, FileNotFoundError):
+            surface = pg.Surface(ITEM_SIZE, pg.SRCALPHA)
+            pg.draw.rect(surface, ITEM_COLORS[self.type], surface.get_rect(), border_radius=8)
+            pg.draw.circle(surface, (255, 255, 255), (ITEM_SIZE[0]//2, ITEM_SIZE[1]//2), 4)
+            return surface
+
+    def update(self) -> None:
+        self.rect.y += ITEM_SPEED
+        if self.rect.top > SCREEN_HEIGHT:
+            self.kill()
 
 
 # ============================================================
 # 主人公クラス
 # ============================================================
-
-class Player:
-    def __init__(self):
+class Player(pg.sprite.Sprite):
+    def __init__(self) -> None:
+        super().__init__()
         self.image = self.load_image()
-        self.rect = self.image.get_rect(
-            center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 80)
-        )
+        self.rect = self.image.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 80))
+        
         self.last_shot_time = 0
+        self.hp = PLAYER_MAX_HP
+        self.stock_item = None
+        self.invincible_end_time = 0
+        self.rapid_fire_end_time = 0
 
-    def load_image(self):
+    def load_image(self) -> pg.Surface:
         try:
-            image = pygame.image.load(PLAYER_IMAGE).convert_alpha()
-            return pygame.transform.smoothscale(image, PLAYER_SIZE)
-
-        except (pygame.error, FileNotFoundError):
-            print("主人公画像が見つかりません。仮画像を使用します。")
-
-            surface = pygame.Surface(PLAYER_SIZE, pygame.SRCALPHA)
-            pygame.draw.polygon(
-                surface,
-                PLAYER_COLOR,
-                [(32, 0), (4, 58), (32, 46), (60, 58)]
-            )
+            image = pg.image.load(PLAYER_IMAGE).convert_alpha()
+            return pg.transform.smoothscale(image, PLAYER_SIZE)
+        except (pg.error, FileNotFoundError):
+            surface = pg.Surface(PLAYER_SIZE, pg.SRCALPHA)
+            pg.draw.polygon(surface, PLAYER_COLOR, [(32, 0), (4, 58), (32, 46), (60, 58)])
             return surface
 
-    def update(self, keys):
+    def update(self, keys: tuple) -> None:
         dx = 0
         dy = 0
-
-        # 矢印キー・WASDによる移動
-        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+        if keys[pg.K_LEFT] or keys[pg.K_a]:
             dx -= PLAYER_SPEED
-
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+        if keys[pg.K_RIGHT] or keys[pg.K_d]:
             dx += PLAYER_SPEED
-
-        if keys[pygame.K_UP] or keys[pygame.K_w]:
+        if keys[pg.K_UP] or keys[pg.K_w]:
             dy -= PLAYER_SPEED
-
-        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+        if keys[pg.K_DOWN] or keys[pg.K_s]:
             dy += PLAYER_SPEED
 
         self.rect.x += dx
         self.rect.y += dy
+        self.rect.clamp_ip(pg.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
 
-        # 画面外に出ないように制限
-        self.rect.clamp_ip(
-            pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
-        )
+    def shoot(self, now: int) -> Projectile | None:
+        current_interval = PLAYER_SHOT_INTERVAL
+        if now < self.rapid_fire_end_time:
+            current_interval = 80  
 
-    def shoot(self, now):
-        # 一定時間ごとに弾を発射
-        if now - self.last_shot_time < PLAYER_SHOT_INTERVAL:
+        if now - self.last_shot_time < current_interval:
             return None
 
         self.last_shot_time = now
-
-        return Projectile(
-            self.rect.centerx,
-            self.rect.top,
-            0,
-            -PLAYER_BULLET_SPEED,
-            PLAYER_BULLET_COLOR
-        )
-
-    def draw(self, screen):
-        screen.blit(self.image, self.rect)
+        return Projectile(self.rect.centerx, self.rect.top, 0, -PLAYER_BULLET_SPEED, PLAYER_BULLET_COLOR)
 
 
 # ============================================================
 # 敵クラス
 # ============================================================
-
-class Enemy:
-    def __init__(self):
+class Enemy(pg.sprite.Sprite):
+    def __init__(self) -> None:
+        super().__init__()
         self.image = self.load_image()
-
-        x = random.randint(
-            ENEMY_SIZE[0] // 2,
-            SCREEN_WIDTH - ENEMY_SIZE[0] // 2
-        )
-
         self.rect = self.image.get_rect()
-        self.rect.midtop = (x, -ENEMY_SIZE[1])
+        self.rect.midtop = (random.randint(ENEMY_SIZE[0] // 2, SCREEN_WIDTH - ENEMY_SIZE[0] // 2), -ENEMY_SIZE[1])
+        self.last_shot_time = pg.time.get_ticks()
 
-        self.last_shot_time = pygame.time.get_ticks()
-
-    def load_image(self):
+    def load_image(self) -> pg.Surface:
         try:
-            image = pygame.image.load(
-                ENEMY_IMAGE
-            ).convert_alpha()
-
-            return pygame.transform.smoothscale(
-                image,
-                ENEMY_SIZE
-            )
-
-        except (pygame.error, FileNotFoundError):
-            print("敵画像が見つかりません。仮画像を使用します。")
-
-            surface = pygame.Surface(
-                ENEMY_SIZE,
-                pygame.SRCALPHA
-            )
-
-            pygame.draw.ellipse(
-                surface,
-                ENEMY_COLOR,
-                surface.get_rect()
-            )
-
+            image = pg.image.load(ENEMY_IMAGE).convert_alpha()
+            return pg.transform.smoothscale(image, ENEMY_SIZE)
+        except (pg.error, FileNotFoundError):
+            surface = pg.Surface(ENEMY_SIZE, pg.SRCALPHA)
+            pg.draw.ellipse(surface, ENEMY_COLOR, surface.get_rect())
             return surface
-    def update(self):
-        # 敵は画面上部から下方向へ移動
-        self.rect.y += ENEMY_SPEED
 
-    def shoot(self, now, player_center):
+    def update(self) -> None:
+        self.rect.y += ENEMY_SPEED
+        if self.rect.top > SCREEN_HEIGHT:
+            self.kill()
+
+    def shoot(self, now: int, player_center: tuple[int, int]) -> Projectile | None:
         if now - self.last_shot_time < ENEMY_SHOT_INTERVAL:
             return None
 
         self.last_shot_time = now
-
-        # 主人公の方向に向けて弾を発射
         dx = player_center[0] - self.rect.centerx
         dy = player_center[1] - self.rect.centery
-
         distance = math.hypot(dx, dy)
 
         if distance == 0:
@@ -224,44 +235,34 @@ class Enemy:
         vx = dx / distance * ENEMY_BULLET_SPEED
         vy = dy / distance * ENEMY_BULLET_SPEED
 
-        return Projectile(
-            self.rect.centerx,
-            self.rect.bottom,
-            vx,
-            vy,
-            ENEMY_BULLET_COLOR,
-            radius=6
-        )
-
-    def draw(self, screen):
-        screen.blit(self.image, self.rect)
+        return Projectile(self.rect.centerx, self.rect.bottom, vx, vy, ENEMY_BULLET_COLOR, radius=6)
 
 # ============================================================
 # 体力ゲージクラス
 # ============================================================
-
 class Life:
     def __init__(self):
         self.hp = 100
         self.max_hp = 100
 
-    # ダメージ処理
     def hp_damage(self, damage):
         self.hp -= damage
         if self.hp < 0:
             self.hp = 0
+            
+    def heal(self, amount):
+        self.hp += amount
+        if self.hp > self.max_hp:
+            self.hp = self.max_hp
 
-    # 体力ゲージ描画
     def draw(self, screen):
         x = 20
         y = 20
         width = 200
         height = 20
 
-        # ゲージの背景
-        pygame.draw.rect(screen, (100, 100, 100),(x, y, width, height))
+        pg.draw.rect(screen, (100, 100, 100),(x, y, width, height))
 
-        # HPによって色を変更
         if self.hp > 50:
             color = (0, 255, 0)
         elif self.hp > 20:
@@ -269,11 +270,9 @@ class Life:
         else:
             color = (255, 0, 0)
 
-        # HPゲージ
-        pygame.draw.rect(screen, color,(x, y, width * self.hp / self.max_hp, height))
+        pg.draw.rect(screen, color,(x, y, width * self.hp / self.max_hp, height))
 
-        # HPの数値
-        font = pygame.font.SysFont(None, 30)
+        font = pg.font.SysFont(None, 30)
         text = font.render(f"HP: {self.hp}/{self.max_hp}", True, (255, 255, 255))
         screen.blit(text, (x, y + 25))
 
@@ -282,48 +281,30 @@ class Life:
 # ============================================================
 class Boss:
     def __init__(self):
-            self.image = self.load_image()
-
-            x = random.randint(
-                BOSS_SIZE[0] // 2,
-                SCREEN_WIDTH - BOSS_SIZE[0] // 2
-            )
-            pygame.mixer.music.load(BOSS_BGM) #  BGMの読み込み
-            pygame.mixer.music.play(loops=-1) #  ループ再生
-            self.rect = self.image.get_rect()
-            self.rect.midtop = (x, -BOSS_SIZE[1])
-            self.hp = 10
-            self.last_shot_time = pygame.time.get_ticks()
+        self.image = self.load_image()
+        x = random.randint(BOSS_SIZE[0] // 2, SCREEN_WIDTH - BOSS_SIZE[0] // 2)
+        
+        try:
+            pg.mixer.music.load(BOSS_BGM) 
+            pg.mixer.music.play(loops=-1) 
+        except pg.error:
+            pass # BGMが読み込めない場合はスキップ
+            
+        self.rect = self.image.get_rect()
+        self.rect.midtop = (x, -BOSS_SIZE[1])
+        self.hp = 10
+        self.last_shot_time = pg.time.get_ticks()
     
     def load_image(self):
         try:
-            image = pygame.image.load(
-                BOSS_IMAGE
-            ).convert_alpha()
-
-            return pygame.transform.smoothscale(
-                image,
-                BOSS_SIZE
-            )
-
-        except (pygame.error, FileNotFoundError):
-            print("ボス画像が見つかりません。仮画像を使用します。")
-
-            surface = pygame.Surface(
-                BOSS_SIZE,
-                pygame.SRCALPHA
-            )
-
-            pygame.draw.ellipse(
-                surface,
-                BOSS_COLOR,
-                surface.get_rect()
-            )
-
+            image = pg.image.load(BOSS_IMAGE).convert_alpha()
+            return pg.transform.smoothscale(image, BOSS_SIZE)
+        except (pg.error, FileNotFoundError):
+            surface = pg.Surface(BOSS_SIZE, pg.SRCALPHA)
+            pg.draw.ellipse(surface, BOSS_COLOR, surface.get_rect())
             return surface
 
     def update(self):
-        # 画面上部の位置まで降りてくる
         if self.rect.top < 30:
             self.rect.y += 2  
 
@@ -333,10 +314,8 @@ class Boss:
 
         self.last_shot_time = now
 
-        # 主人公の方向に向けて弾を発射
         dx = player_center[0] - self.rect.centerx
         dy = player_center[1] - self.rect.centery
-
         distance = math.hypot(dx, dy)
 
         if distance == 0:
@@ -345,345 +324,264 @@ class Boss:
         vx = dx / distance * BOSS_BULLET_SPEED
         vy = dy / distance * BOSS_BULLET_SPEED
 
-        return Projectile(
-            self.rect.centerx,
-            self.rect.bottom,
-            vx,
-            vy,
-            BOSS_BULLET_COLOR,
-            radius=6
-        )
+        return Projectile(self.rect.centerx, self.rect.bottom, vx, vy, BOSS_BULLET_COLOR, radius=6)
     
     def draw(self, screen):
         screen.blit(self.image, self.rect)    
 
-# ゲームクリア関数
-def game_clear(screen:pygame.Surface):
-    pygame.mixer.music.stop()  # boss_bgm停止
-    pygame.mixer.music.load(CLEAR_BGM) #  クリアBGM読み込み
-    pygame.mixer.music.play() #  一回だけ流す
-    #  背景を暗く
-    brack=pygame.Surface((SCREEN_WIDTH,SCREEN_HEIGHT))
-    pygame.draw.rect(brack,(0,0,0),pygame.Rect(0,0,SCREEN_WIDTH,SCREEN_HEIGHT))
+def game_clear(screen:pg.Surface):
+    pg.mixer.music.stop()
+    try:
+        pg.mixer.music.load(CLEAR_BGM) 
+        pg.mixer.music.play() 
+    except pg.error:
+        pass
+        
+    brack=pg.Surface((SCREEN_WIDTH,SCREEN_HEIGHT))
+    pg.draw.rect(brack,(0,0,0),pg.Rect(0,0,SCREEN_WIDTH,SCREEN_HEIGHT))
     brack.set_alpha(200)
-    #  文字表示
-    font=pygame.font.Font(None, 70)
+    
+    font=pg.font.Font(None, 70)
     txt=font.render("GameClear!!",True,(255,255,0))
     text_rct=txt.get_rect(center=(SCREEN_WIDTH//2,SCREEN_HEIGHT//2))
     brack.blit(txt,text_rct)
-    #  キラキラの星の表示
-    star1_img=pygame.image.load(STAR_IMAGE)
-    star1_img=pygame.transform.scale(star1_img,(50,50))
-    star1_rct=star1_img.get_rect(center=(SCREEN_WIDTH//10,SCREEN_HEIGHT//2))
-    brack.blit(star1_img,star1_rct)
-    star2_img=pygame.image.load(STAR_IMAGE)
-    star2_img=pygame.transform.scale(star2_img,(50,50))
-    star2_rct=star2_img.get_rect(center=((SCREEN_WIDTH - SCREEN_WIDTH//10),SCREEN_HEIGHT//2))
-    brack.blit(star2_img,star2_rct)
+    
+    try:
+        star1_img = pg.image.load(STAR_IMAGE)
+        star1_img = pg.transform.scale(star1_img,(50,50))
+        star1_rct = star1_img.get_rect(center=(SCREEN_WIDTH//10,SCREEN_HEIGHT//2))
+        brack.blit(star1_img,star1_rct)
+        star2_img = pg.image.load(STAR_IMAGE)
+        star2_img = pg.transform.scale(star2_img,(50,50))
+        star2_rct = star2_img.get_rect(center=((SCREEN_WIDTH - SCREEN_WIDTH//10),SCREEN_HEIGHT//2))
+        brack.blit(star2_img,star2_rct)
+    except pg.error:
+        pass
 
     screen.blit(brack,(0,0))
-    pygame.display.update()
+    pg.display.update()
     time.sleep(7)
-    pygame.quit()
+    pg.quit()
     sys.exit()
+
 
 # ============================================================
 # ゲーム管理クラス
 # ============================================================
-
 class Game:
-    def __init__(self):
-        pygame.init()
-        self.life = Life()
-        pygame.display.set_caption(WINDOW_TITLE)
+    def __init__(self) -> None:
+        pg.init()
+        pg.font.init()
+        pg.display.set_caption(WINDOW_TITLE)
 
-        self.screen = pygame.display.set_mode(
-            (SCREEN_WIDTH, SCREEN_HEIGHT)
-        )
-
-        self.clock = pygame.time.Clock()
+        self.screen = pg.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.clock = pg.time.Clock()
         self.running = True
+        self.font = pg.font.SysFont(None, 28)
 
         self.background = self.load_background()
-
         self.player = Player()
+        self.life = Life()
 
-        self.enemies = []
-        self.player_bullets = []
-        self.enemy_bullets = []
+        self.enemies = pg.sprite.Group()
+        self.player_bullets = pg.sprite.Group()
+        self.enemy_bullets = pg.sprite.Group()
+        self.items = pg.sprite.Group()
 
-        self.boss = None #  開始時はbossはnone
-        self.boss_spawn_time = 30000 # 開始からこのミリ秒数後にスポーン
-        self.last_boss_spawn = pygame.time.get_ticks()
+        self.boss = None 
+        self.boss_spawn_time = 30000 # 開始から30秒後にスポーン
+        self.last_boss_spawn = pg.time.get_ticks()
 
-        self.last_enemy_spawn = pygame.time.get_ticks()
+        self.last_enemy_spawn = pg.time.get_ticks()
+        self.global_stun_end_time = 0 
 
-    def load_background(self):
+    def load_background(self) -> pg.Surface | None:
         try:
-            image = pygame.image.load(
-                BACKGROUND_IMAGE
-            ).convert()
-
-            return pygame.transform.scale(
-                image,
-                (SCREEN_WIDTH, SCREEN_HEIGHT)
-            )
-
-        except (pygame.error, FileNotFoundError):
-            print("背景画像が見つかりません。単色背景を使用します。")
+            image = pg.image.load(BACKGROUND_IMAGE).convert()
+            return pg.transform.scale(image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+        except (pg.error, FileNotFoundError):
             return None
 
-    def handle_events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+    def handle_events(self) -> None:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
                 self.running = False
+            elif event.type == pg.KEYDOWN:
+                if event.key == pg.K_x:
+                    self.use_item()
 
-    def spawn_enemy(self):
-        self.enemies.append(Enemy())
+    def use_item(self) -> None:
+        if self.player.stock_item is None:
+            return
+            
+        item_type = self.player.stock_item
+        self.player.stock_item = None
+        now = pg.time.get_ticks()
 
+        if item_type == ITEM_HEAL:
+            self.player.hp = min(self.player.hp + 1, PLAYER_MAX_HP)
+            self.life.heal(34) # UI体力ゲージの回復
+        elif item_type == ITEM_STUN:
+            self.global_stun_end_time = now + 4000  
+        elif item_type == ITEM_INVINCIBLE:
+            self.player.invincible_end_time = now + 5000  
+        elif item_type == ITEM_RAPID:
+            self.player.rapid_fire_end_time = now + 5000  
 
     def spawn_boss(self):
         if self.boss is None:
             self.boss = Boss()
-            print("ボス登場")
-    def update(self):
-        now = pygame.time.get_ticks()
-        keys = pygame.key.get_pressed()
 
-        # 主人公の移動
+    def update(self) -> None:
+        now = pg.time.get_ticks()
+        keys = pg.key.get_pressed()
+
         self.player.update(keys)
 
-        # スペースキーによる弾の発射
-        if keys[pygame.K_SPACE]:
+        if keys[pg.K_SPACE]:
             bullet = self.player.shoot(now)
-
             if bullet is not None:
-                self.player_bullets.append(bullet)
+                self.player_bullets.add(bullet)
 
-        # 一定時間ごとに敵を生成
-        if now - self.last_enemy_spawn >= ENEMY_SPAWN_INTERVAL:
-            self.spawn_enemy()
-            self.last_enemy_spawn = now
+        is_stunned = now < self.global_stun_end_time
 
-        # 敵の移動と敵弾の発射
-        for enemy in self.enemies:
-            enemy.update()
+        # 敵の生成と更新
+        if not is_stunned:
+            if now - self.last_enemy_spawn >= ENEMY_SPAWN_INTERVAL:
+                self.enemies.add(Enemy())
+                self.last_enemy_spawn = now
 
-            bullet = enemy.shoot(
-                now,
-                self.player.rect.center
-            )
+            self.enemies.update()
+            for enemy in self.enemies:
+                bullet = enemy.shoot(now, self.player.rect.center)
+                if bullet is not None:
+                    self.enemy_bullets.add(bullet)
 
-            if bullet is not None:
-                self.enemy_bullets.append(bullet)
-
-        # 弾の移動
-        for bullet in self.player_bullets:
-            bullet.update()
-
-        for bullet in self.enemy_bullets:
-            bullet.update()
-
-        self.remove_offscreen_objects()
-        self.check_collisions()
+        # 弾やアイテムの更新
+        self.player_bullets.update()
+        self.enemy_bullets.update()
+        self.items.update()
       
-       # ボスをn秒後に1回だけ出現させる
-        if (
-            self.boss is None
-            and now - self.last_boss_spawn >= self.boss_spawn_time
-        ):
+        # ボス出現処理
+        if self.boss is None and now - self.last_boss_spawn >= self.boss_spawn_time:
             self.spawn_boss()
 
-        # ボスが存在するときの処理
         if self.boss is not None:
-            self.boss.update() #  bossがいたらまずアップデート
-
-            # ボスの弾を発射
-            bullet = self.boss.shoot(
-                now,
-                self.player.rect.center
-            )
-
+            self.boss.update()
+            bullet = self.boss.shoot(now, self.player.rect.center)
             if bullet is not None:
-                self.enemy_bullets.append(bullet)
+                self.enemy_bullets.add(bullet)
+
+        self.check_collisions(now)
         
-    def remove_offscreen_objects(self):
-        # 画面外に出た弾を削除
-        self.player_bullets = [
-            bullet for bullet in self.player_bullets
-            if bullet.rect.bottom > 0
-        ]
-
-        self.enemy_bullets = [
-            bullet for bullet in self.enemy_bullets
-            if (
-                bullet.rect.bottom > 0
-                and bullet.rect.top < SCREEN_HEIGHT
-                and bullet.rect.right > 0
-                and bullet.rect.left < SCREEN_WIDTH
-            )
-        ]
-
-        # 画面下に到達した敵を削除
-        self.enemies = [
-            enemy for enemy in self.enemies
-            if enemy.rect.top < SCREEN_HEIGHT
-        ]
-
-    def check_collisions(self):
+    def check_collisions(self, now: int) -> None:
         # 主人公の弾と敵の当たり判定
-        for bullet in self.player_bullets[:]:
-            hit_enemy = None
+        hits = pg.sprite.groupcollide(self.enemies, self.player_bullets, True, True)
+        for enemy in hits.keys():
+            if random.random() < ITEM_DROP_RATE:
+                item_type = random.choice([ITEM_HEAL, ITEM_STUN, ITEM_INVINCIBLE, ITEM_RAPID])
+                self.items.add(Item(enemy.rect.centerx, enemy.rect.centery, item_type))
 
-            for enemy in self.enemies:
-                if bullet.rect.colliderect(enemy.rect):
-                    hit_enemy = enemy
-                    break
+        # 主人公の弾とボスの当たり判定
+        if self.boss is not None:
+            for bullet in list(self.player_bullets):
+                if bullet.rect.colliderect(self.boss.rect):
+                    bullet.kill()
+                    self.boss.hp -= 1
+                    if self.boss.hp <= 0:
+                        self.boss = None
+                        game_clear(self.screen)
+                        break
 
-            if hit_enemy is not None:
-                self.player_bullets.remove(bullet)
-                self.enemies.remove(hit_enemy)
-
-        # 敵の弾と主人公の当たり判定
-        for bullet in self.enemy_bullets:
-            if bullet.rect.colliderect(self.player.rect):
-                # 当たった弾を削除
-                self.enemy_bullets.remove(bullet)
-
-                # 体力を10減らす
-                self.life.hp_damage(10)
-
-                # HPが0になったらゲームオーバー
-                if self.life.hp <= 0:
-                    print("GAME OVER")
+        # 主人公と敵・敵弾の当たり判定 (無敵時間外)
+        if now >= self.player.invincible_end_time:
+            bullet_hits = pg.sprite.spritecollide(self.player, self.enemy_bullets, True)
+            enemy_hits = pg.sprite.spritecollide(self.player, self.enemies, True)
+            
+            if bullet_hits or enemy_hits:
+                self.player.hp -= 1
+                self.life.hp_damage(34) # UI体力ゲージにもダメージを反映
+                self.player.invincible_end_time = now + 1500  
+                if self.player.hp <= 0 or self.life.hp <= 0:
                     self.running = False
-                break
 
-                # print("GAME OVER: 敵の弾が主人公に命中しました。")
-                # self.running = False
-                # break
+        # 主人公とアイテムの当たり判定
+        item_hits = pg.sprite.spritecollide(self.player, self.items, False)
+        for item in item_hits:
+            if self.player.stock_item is None:
+                self.player.stock_item = item.type
+                item.kill() 
+
     def draw_damage_effect(self):
-        if self.life.hp <= 10:
+        if self.life.hp <= 30: # ダメージエフェクトの発生閾値を調整
             x = self.player.rect.centerx
             y = self.player.rect.centery
-
-            # 煙のアニメーション
-            t = pygame.time.get_ticks() / 300
-
-            hai = pygame.Surface(
-                self.screen.get_size(), pygame.SRCALPHA
-            )
+            t = pg.time.get_ticks() / 300
+            hai = pg.Surface(self.screen.get_size(), pg.SRCALPHA)
 
             for i in range(3):
                 smoke_x = x + math.sin(t + i * 2) * 15
                 smoke_y = y - 35 - i * 15 - abs(math.sin(t + i)) * 10
-
-                pygame.draw.circle(
-                    hai,
-                    (130, 130, 130, 100),
-                    (int(smoke_x), int(smoke_y)),
-                    12 + i * 3
-                )
+                pg.draw.circle(hai, (130, 130, 130, 100), (int(smoke_x), int(smoke_y)), 12 + i * 3)
 
             self.screen.blit(hai, (0, 0))
+            pg.draw.lines(self.screen, (40, 40, 40), False, [(x, y - 20), (x - 8, y - 5), (x + 3, y + 2), (x - 5, y + 18)], 3)
+            pg.draw.lines(self.screen, (40, 40, 40), False, [(x - 8, y - 5), (x - 18, y - 12), (x - 22, y - 22)], 2)
 
-            # ひび割れ
-            pygame.draw.lines(
-                self.screen,
-                (40, 40, 40),
-                False,
-                [
-                    (x, y - 20),
-                    (x - 8, y - 5),
-                    (x + 3, y + 2),
-                    (x - 5, y + 18)
-                ],
-                3
-            )
+    def draw_ui(self, now: int) -> None:
+        if self.player.stock_item is not None:
+            item_name = ITEM_NAMES[self.player.stock_item]
+            item_text = self.font.render(f"ITEM: {item_name} [Press X]", True, ITEM_COLORS[self.player.stock_item])
+        else:
+            item_text = self.font.render("ITEM: NONE", True, (150, 150, 150))
+        self.screen.blit(item_text, (20, 80))
 
-            pygame.draw.lines(
-                self.screen,
-                (40, 40, 40),
-                False,
-                [
-                    (x - 8, y - 5),
-                    (x - 18, y - 12),
-                    (x - 22, y - 22)
-                ],
-                2
-            )
-        # 主人公の弾とボスの当たり判定
-        if self.boss is not None:
+        y_offset = 110
+        if now < self.player.invincible_end_time:
+            text = self.font.render("INVINCIBLE ACTIVE!", True, ITEM_COLORS[ITEM_INVINCIBLE])
+            self.screen.blit(text, (20, y_offset))
+            y_offset += 25
+        if now < self.player.rapid_fire_end_time:
+            text = self.font.render("RAPID FIRE ACTIVE!", True, ITEM_COLORS[ITEM_RAPID])
+            self.screen.blit(text, (20, y_offset))
+            y_offset += 25
+        if now < self.global_stun_end_time:
+            text = self.font.render("ENEMY STUNNED!", True, ITEM_COLORS[ITEM_STUN])
+            self.screen.blit(text, (20, y_offset))
 
-            for bullet in self.player_bullets[:]:
+    def draw(self) -> None:
+        now = pg.time.get_ticks()
 
-                if bullet.rect.colliderect(self.boss.rect):
-
-                    self.player_bullets.remove(bullet)
-                    self.boss.hp -= 1
-
-                    # print("ボスHP:", self.boss.hp)
-
-                    # ボスを倒した場合
-                    if self.boss.hp <= 0:
-                        print("BOSS DEFEATED!")
-                        self.boss = None
-                        game_clear(self.screen)
-
-                    break
-        
-
-    def draw(self):
-        # 背景描画
         if self.background is not None:
             self.screen.blit(self.background, (0, 0))
         else:
             self.screen.fill((5, 8, 30))
 
-        # 各オブジェクト描画
-        self.player.draw(self.screen)
-
-        for enemy in self.enemies:
-            enemy.draw(self.screen)
-
-        for bullet in self.player_bullets:
-            bullet.draw(self.screen)
-
-        for bullet in self.enemy_bullets:
-            bullet.draw(self.screen)
-
-        self.life.draw(self.screen)
-        self.draw_damage_effect()
-
-        for enemy in self.enemies:
-            enemy.draw(self.screen)
-
-        for bullet in self.player_bullets:
-            bullet.draw(self.screen)
-
-        for bullet in self.enemy_bullets:
-            bullet.draw(self.screen)
-        # ボスの描画
+        self.enemies.draw(self.screen)
+        self.items.draw(self.screen)
+        self.player_bullets.draw(self.screen)
+        self.enemy_bullets.draw(self.screen)
+            
+        self.screen.blit(self.player.image, self.player.rect)
+        
         if self.boss is not None:
             self.boss.draw(self.screen)
 
-        pygame.display.flip()
+        self.draw_ui(now)
+        self.life.draw(self.screen)
+        self.draw_damage_effect()
 
-    def run(self):
+        pg.display.flip()
+
+    def run(self) -> None:
         while self.running:
             self.clock.tick(FPS)
-
             self.handle_events()
             self.update()
             self.draw()
 
-        pygame.quit()
+        pg.quit()
         sys.exit()
-
-
-# ============================================================
-# メイン処理
-# ============================================================
 
 if __name__ == "__main__":
     game = Game()
