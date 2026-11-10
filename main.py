@@ -2,6 +2,8 @@ import math
 import random
 import sys
 from pathlib import Path
+import os
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 
 import pygame as pg
@@ -790,6 +792,7 @@ class Game:
         text = font.render("Game Clear!!", True, (255, 255, 0))
         overlay.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)))
 
+        #　星の描画
         try:
             star = pg.image.load(str(STAR_IMAGE)).convert_alpha()
             star = pg.transform.scale(star, (50, 50))
@@ -800,7 +803,7 @@ class Game:
 
         self.screen.blit(overlay, (0, 0))
         pg.display.flip()
-        pg.time.delay(3000)
+        pg.time.delay(7000) # ジングルが流れ終わるまで待つ
 
     def draw_stamina_bar(self):
         bar_width = 200 * (self.player.stamina / MAX_STAMINA)
