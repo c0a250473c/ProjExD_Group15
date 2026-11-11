@@ -256,27 +256,27 @@ class Player(pg.sprite.Sprite):
         # このコードは、ゲームが動いている間、毎フレーム（常に）キャラクターの状態を更新する処理の一部
         dx = 0
         dy = 0
-        # if keys[pg.K_LEFT] or keys[pg.K_a]:
-        #     dx -= PLAYER_SPEED
-        # if keys[pg.K_RIGHT] or keys[pg.K_d]:
-        #     dx += PLAYER_SPEED
-        # if keys[pg.K_UP] or keys[pg.K_w]:
-        #     dy -= PLAYER_SPEED
-        # if keys[pg.K_DOWN] or keys[pg.K_s]:
-        #     dy += PLAYER_SPEED
-
-        # 矢印キー・WASDによる移動
         if keys[pg.K_LEFT] or keys[pg.K_a]:
-            dx -= current_speed # 変更
-
+            dx -= PLAYER_SPEED
         if keys[pg.K_RIGHT] or keys[pg.K_d]:
-            dx += current_speed # 変更
-
+            dx += PLAYER_SPEED
         if keys[pg.K_UP] or keys[pg.K_w]:
-            dy -= current_speed # 変更
-
+            dy -= PLAYER_SPEED
         if keys[pg.K_DOWN] or keys[pg.K_s]:
-            dy += current_speed # 変更
+            dy += PLAYER_SPEED
+
+        # # 矢印キー・WASDによる移動
+        # if keys[pg.K_LEFT] or keys[pg.K_a]:
+        #     dx -= current_speed # 変更
+
+        # if keys[pg.K_RIGHT] or keys[pg.K_d]:
+        #     dx += current_speed # 変更
+
+        # if keys[pg.K_UP] or keys[pg.K_w]:
+        #     dy -= current_speed # 変更
+
+        # if keys[pg.K_DOWN] or keys[pg.K_s]:
+        #     dy += current_speed # 変更
 
         self.rect.x += dx
         self.rect.y += dy
