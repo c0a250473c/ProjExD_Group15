@@ -256,14 +256,14 @@ class Player(pg.sprite.Sprite):
         # このコードは、ゲームが動いている間、毎フレーム（常に）キャラクターの状態を更新する処理の一部
         dx = 0
         dy = 0
-        if keys[pg.K_LEFT] or keys[pg.K_a]:
-            dx -= PLAYER_SPEED
-        if keys[pg.K_RIGHT] or keys[pg.K_d]:
-            dx += PLAYER_SPEED
-        if keys[pg.K_UP] or keys[pg.K_w]:
-            dy -= PLAYER_SPEED
-        if keys[pg.K_DOWN] or keys[pg.K_s]:
-            dy += PLAYER_SPEED
+        # if keys[pg.K_LEFT] or keys[pg.K_a]:
+        #     dx -= PLAYER_SPEED
+        # if keys[pg.K_RIGHT] or keys[pg.K_d]:
+        #     dx += PLAYER_SPEED
+        # if keys[pg.K_UP] or keys[pg.K_w]:
+        #     dy -= PLAYER_SPEED
+        # if keys[pg.K_DOWN] or keys[pg.K_s]:
+        #     dy += PLAYER_SPEED
 
         # 矢印キー・WASDによる移動
         if keys[pg.K_LEFT] or keys[pg.K_a]:
@@ -295,7 +295,7 @@ class Player(pg.sprite.Sprite):
         return Projectile(
         self.rect.centerx, self.rect.top, 0, -PLAYER_BULLET_SPEED,
         PLAYER_BULLET_COLOR
-    )
+        )
 
     def draw(self, screen):
         screen.blit(self.image, self.rect)
