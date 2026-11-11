@@ -131,7 +131,7 @@ class Score:
         image = self.font.render(f"Score: {self.value}", True, (255, 255, 255))
         rect = image.get_rect(bottomleft=(15, SCREEN_HEIGHT - 60))
         screen.blit(image, rect)
-# どでか弾と打つスタミナの数字
+# どでか弾と鬱スタミナの数字
 MAX_STAMINA = 100.0
 UTSU_THRESHOLD = 30.0
 UTSU_SPEED = 2.0
