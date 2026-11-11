@@ -13,7 +13,7 @@ import pygame as pg
 # 設定
 # ============================================================
 SCREEN_WIDTH = 480
-SCREEN_HEIGHT = 800
+SCREEN_HEIGHT = 700
 FPS = 60
 WINDOW_TITLE = "SPACE SHOOTER"
 
@@ -32,7 +32,7 @@ PLAYER_SIZE = (64, 64)
 PLAYER_SPEED = 5
 PLAYER_SHOT_INTERVAL = 250
 PLAYER_BULLET_SPEED = 9
-PLAYER_MAX_HP = 3
+PLAYER_MAX_HP = 10
 
 # 50点ごとに発射間隔を短縮
 SHOT_INTERVAL_DECREASE = 25
@@ -41,7 +41,7 @@ MIN_SHOT_INTERVAL = 80
 ENEMY_SIZE = (48, 48)
 ENEMY_SPEED = 2
 ENEMY_SPAWN_INTERVAL = 1400
-ENEMY_SHOT_INTERVAL = 1600
+ENEMY_SHOT_INTERVAL = 1800
 ENEMY_BULLET_SPEED = 4
 ZIGZAG_ENEMY_SPEED_X=3
 ZIGZAG_ENEMY_RATE=0.25
@@ -54,15 +54,15 @@ ARMOR_WEAK_KIND="big"
 
 BOSS_SIZE = (100, 100)
 BOSS_SPAWN_TIME = 30000 #このミリ秒後にボススポーン
-BOSS_SHOT_INTERVAL = 1000
-BOSS_BULLET_SPEED = 6
+BOSS_SHOT_INTERVAL = 400
+BOSS_BULLET_SPEED = 6.5
 
 PLAYER_COLOR = (80, 220, 255)
 ENEMY_COLOR = (255, 100, 100)
 PLAYER_BULLET_COLOR = (255, 245, 100)
 ENEMY_BULLET_COLOR = (255, 120, 80)
 BOSS_COLOR = (20, 220, 20)
-BOSS_BULLET_COLOR = (255, 0, 0)
+BOSS_BULLET_COLOR = (255, 59, 48) 
 
 ITEM_SIZE = (32, 32)
 ITEM_SPEED = 2
@@ -254,29 +254,39 @@ class Player(pg.sprite.Sprite):
             self.stamina = min(self.stamina + STAMINA_RECOVERY, MAX_STAMINA)
         current_speed = PLAYER_SPEED if self.stamina >= UTSU_THRESHOLD else UTSU_SPEED
         # このコードは、ゲームが動いている間、毎フレーム（常に）キャラクターの状態を更新する処理の一部
+
+         # スタミナが30未満なら鬱状態
+        if self.stamina < UTSU_THRESHOLD:
+            current_speed = UTSU_SPEED
+        else:
+            current_speed = PLAYER_SPEED
+        
         dx = 0
         dy = 0
-        if keys[pg.K_LEFT] or keys[pg.K_a]:
-            dx -= PLAYER_SPEED
-        if keys[pg.K_RIGHT] or keys[pg.K_d]:
-            dx += PLAYER_SPEED
-        if keys[pg.K_UP] or keys[pg.K_w]:
-            dy -= PLAYER_SPEED
-        if keys[pg.K_DOWN] or keys[pg.K_s]:
-            dy += PLAYER_SPEED
-
-        # # 矢印キー・WASDによる移動
+        # 2重記述っぽいのでコメントアウト
         # if keys[pg.K_LEFT] or keys[pg.K_a]:
-        #     dx -= current_speed # 変更
-
+        #     dx -= PLAYER_SPEED
         # if keys[pg.K_RIGHT] or keys[pg.K_d]:
-        #     dx += current_speed # 変更
-
+        #     dx += PLAYER_SPEED
         # if keys[pg.K_UP] or keys[pg.K_w]:
-        #     dy -= current_speed # 変更
-
+        #     dy -= PLAYER_SPEED
         # if keys[pg.K_DOWN] or keys[pg.K_s]:
-        #     dy += current_speed # 変更
+        #     dy += PLAYER_SPEED
+        
+       
+
+        # 矢印キー・WASDによる移動
+        if keys[pg.K_LEFT] or keys[pg.K_a]:
+            dx -= current_speed # 変更
+
+        if keys[pg.K_RIGHT] or keys[pg.K_d]:
+            dx += current_speed # 変更
+
+        if keys[pg.K_UP] or keys[pg.K_w]:
+            dy -= current_speed # 変更
+
+        if keys[pg.K_DOWN] or keys[pg.K_s]:
+            dy += current_speed # 変更
 
         self.rect.x += dx
         self.rect.y += dy
@@ -307,8 +317,13 @@ class Player(pg.sprite.Sprite):
             self.stamina -= DODEKA_COST
             self.last_dodeka_time = now
             return Projectile(
-                self.rect.centerx, self.rect.top, 0,
-                -PLAYER_BULLET_SPEED + 2, DODEKA_COLOR, radius=DODEKA_RADIUS
+                self.rect.centerx,
+                self.rect.top,
+                0,
+                -PLAYER_BULLET_SPEED + 2,
+                DODEKA_COLOR,
+                radius=DODEKA_RADIUS,
+                kind="big"
             )
         return None
         # 時間経過とスタミナの量の2つの条件を満たした時スタミナをガッツリ消費し巨大な弾を発射する
@@ -420,7 +435,7 @@ class Boss:
         self.image = load_scaled_image(BOSS_IMAGE, BOSS_SIZE, BOSS_COLOR, "ellipse")
         x = random.randint(BOSS_SIZE[0] // 2, SCREEN_WIDTH - BOSS_SIZE[0] // 2)
         self.rect = self.image.get_rect(midtop=(x, -BOSS_SIZE[1]))
-        self.hp = 10
+        self.hp = 20
         self.last_shot_time = pg.time.get_ticks()
 
     def update(self):
@@ -583,7 +598,7 @@ class Game:
             return
 
         self.player.hp -= 1
-        self.life.hp_damage(34)
+        self.life.hp_damage(10)
         self.player.invincible_end_time = now + 1500
 
         print("プレイヤーHP:", self.player.hp)
@@ -612,14 +627,15 @@ class Game:
                 self.player_bullets.add(bullet)
 
         is_stunned = now < self.global_stun_end_time
-        if not is_stunned and now - self.last_enemy_spawn >= ENEMY_SPAWN_INTERVAL:
+        #if not is_stunned and now - self.last_enemy_spawn >= ENEMY_SPAWN_INTERVAL: # 敵が出ている時でなくても打ちたかったのでコメントアウト
+        # ここから
+        if keys[pg.K_t ]:# tキーによるどでか弾の発射
+            dodeka_bullet = self.player.shoot_dodeka(now)
 
-            if keys[pg.K_t ]:# tキーによるどでか弾の発射
-                dodeka_bullet = self.player.shoot_dodeka(now)
+            if dodeka_bullet is not None:
+                self.player_bullets.add(dodeka_bullet)
+        # ここまで
 
-                if dodeka_bullet is not None:
-                    self.player_bullets.add(dodeka_bullet)
- 
         # 一定時間ごとに敵を生成
         if now - self.last_enemy_spawn >= ENEMY_SPAWN_INTERVAL:
             self.spawn_enemy()
