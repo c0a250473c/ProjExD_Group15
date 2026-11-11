@@ -53,7 +53,7 @@ ARMOR_WEAK_KIND="big"
 
 
 BOSS_SIZE = (100, 100)
-BOSS_SPAWN_TIME = 30000
+BOSS_SPAWN_TIME = 30000 #このミリ秒後にボススポーン
 BOSS_SHOT_INTERVAL = 1000
 BOSS_BULLET_SPEED = 6
 
@@ -131,7 +131,7 @@ class Score:
         image = self.font.render(f"Score: {self.value}", True, (255, 255, 255))
         rect = image.get_rect(bottomleft=(15, SCREEN_HEIGHT - 60))
         screen.blit(image, rect)
-# どでか弾と鬱スタミナの数字
+# どでか弾と打つスタミナの数字
 MAX_STAMINA = 100.0
 UTSU_THRESHOLD = 30.0
 UTSU_SPEED = 2.0
@@ -282,18 +282,15 @@ class Player(pg.sprite.Sprite):
         self.rect.y += dy
         self.rect.clamp_ip(pg.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
 
-    def shoot(self, now, shot_interval):
-        if now - self.last_shot_time < shot_interval:
-        # 画面外に出ないように制限
-            self.rect.clamp_ip(
-            pg.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
-        )
-
+       
     def shoot(self, now, shot_interval):
     # 一定時間ごとに弾を発射
         if now - self.last_shot_time < shot_interval:
             return None
-
+        # 画面外に出ないように制限
+        self.rect.clamp_ip(
+        pg.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
+        )
         self.last_shot_time = now
         return Projectile(
         self.rect.centerx, self.rect.top, 0, -PLAYER_BULLET_SPEED,
@@ -428,7 +425,7 @@ class Boss:
 
     def update(self):
         if self.rect.top < 30:
-            self.rect.y += 2
+           self.rect.y += 2
 
     def shoot(self, now, player_center):
         if now - self.last_shot_time < BOSS_SHOT_INTERVAL:
