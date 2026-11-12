@@ -14,6 +14,25 @@
 * 参考URL：
   - [Pygameドキュメント 日本語訳](https://westplain.sakura.ne.jp/translate/pygame/)
   - [Step104 【Pythonで縦スクロールシューティングを作る#3】：敵キャラクターを登場させる](https://note.com/stapa_pcschool/n/n0586afad2a8c)
+  - 使用素材
+    - ベースの背景:
+    https://aipict.com/utility_graphics/universe/
+    - ベースの主人公:
+    https://www.ac-illust.com/main/detail.php?id=26564376
+    - ベースの敵:
+    https://www.ac-illust.com/main/detail.php?id=26564353
+    - ボス:
+    https://www.ac-illust.com/main/detail.php?id=22306150
+    - ボスBGM:
+    https://opentracks.com/bgm/detail/23903
+    - クリアジングル:
+    https://opentracks.com/bgm/detail/4668
+    - 通常BGM:
+    https://opentracks.com/bgm/detail/22990
+    - 爆発SE:
+    https://taira-komori.net/index.html
+    - 爆発画像:
+    https://dot-illust.net/bakuhatsu_01/
 
 ## ゲームの遊び方
 * 移動：矢印キーorWASD
