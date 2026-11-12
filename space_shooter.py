@@ -25,6 +25,9 @@ PLAYER_IMAGE = ASSET_DIR / "player.png"
 ENEMY_IMAGE = ASSET_DIR / "enemy.png"
 BOSS_IMAGE = ASSET_DIR / "boss.png"
 STAR_IMAGE = ASSET_DIR / "star.png"
+BOMB_IMAGE = ASSET_DIR / "bakuhatsu_01.png"
+NORMAL_BGM = ASSET_DIR / "sounds" / "normal_bgm.mp3"
+BOMB_SE = ASSET_DIR / "sounds" / "mini_bomb2.mp3"
 BOSS_BGM = ASSET_DIR / "sounds" / "boss_bgm.mp3"
 CLEAR_BGM = ASSET_DIR / "sounds" / "clear_bgm.mp3"
 
@@ -53,8 +56,8 @@ ARMOR_WEAK_KIND="big"
 
 
 BOSS_SIZE = (100, 100)
-BOSS_SPAWN_TIME = 30000 #このミリ秒後にボススポーン
-BOSS_SHOT_INTERVAL = 400
+BOSS_SPAWN_TIME = 3000 #このミリ秒後にボススポーン
+BOSS_SHOT_INTERVAL = 300
 BOSS_BULLET_SPEED = 6.5
 
 PLAYER_COLOR = (80, 220, 255)
@@ -437,6 +440,10 @@ class Boss:
         self.rect = self.image.get_rect(midtop=(x, -BOSS_SIZE[1]))
         self.hp = 20
         self.last_shot_time = pg.time.get_ticks()
+    def bomb_effect(self,screen):
+        self.image = load_scaled_image(BOMB_IMAGE,BOSS_SIZE,BOSS_COLOR,"ellipse")
+        self.draw(screen)
+        #pg.time.delay(3000)
 
     def update(self):
         if self.rect.top < 30:
@@ -503,6 +510,8 @@ class Game:
 
         try:
             pg.mixer.init()
+            pg.mixer.music.load(NORMAL_BGM)
+            pg.mixer.music.play(loops=-1)
         except pg.error:
             pass
 
@@ -529,6 +538,7 @@ class Game:
         self.global_stun_end_time = 0
         self.game_over = False
         self.boss_bgm_playing = False
+        self.boss_kill = False
 
     def get_shot_interval(self, now):
         interval = PLAYER_SHOT_INTERVAL
@@ -662,6 +672,7 @@ class Game:
         if self.boss is None and now - self.start_time >= BOSS_SPAWN_TIME:
             self.boss = Boss()
             try:
+                pg.mixer.music.stop()
                 pg.mixer.music.load(str(BOSS_BGM))
                 pg.mixer.music.play(-1)
                 self.boss_bgm_playing = True
@@ -707,8 +718,14 @@ class Game:
             )
             self.boss.hp -= len(boss_hits)
             if self.boss.hp <= 0:
-                self.boss = None
+                self.boss.bomb_effect(self.screen) # ボス画像を爆発画像に差し替え
+                self.draw() #  描画
                 pg.mixer.music.stop()
+                effect = pg.mixer.Sound(BOMB_SE)  # 爆発音
+                effect.play()
+                pg.time.delay(2000)
+                self.boss = None
+                
                 self.show_game_clear()
                 self.running = False
                 return
